@@ -1,0 +1,136 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  password      String
+  name          String
+  role          String          // "ADMIN", "MANAGER", "STAFF"
+  tasksAssigned Task[]          @relation("TaskAssignee")
+  comments      Comment[]
+  statusLogs    StatusHistory[]
+  notifications Notification[]  @relation("UserNotifications")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model Email {
+  id              String        @id @default(uuid())
+  messageId       String        @unique  // Microsoft Graph message ID to prevent duplicates
+  subject         String
+  senderEmail     String
+  senderName      String
+  body            String        @db.Text
+  receivedAt      DateTime
+  processedStatus String        // "PENDING", "PROCESSED", "FAILED"
+  createdAt       DateTime      @default(now())
+  task            Task?
+}
+
+model Task {
+  id              String          @id @default(uuid())
+  inquiryId       String          @unique  // Custom counter e.g., "INQ-1001"
+  subject         String
+  customerName    String
+  senderEmail     String
+  description     String          @db.Text
+  status          String          // "NEW_EMAIL", "PENDING_REVIEW", "IN_PROGRESS", "WAITING_FOR_CLIENT", "COMPLETED", "CANCELLED"
+  priority        String          // "LOW", "MEDIUM", "HIGH", "URGENT"
+  dueDate         DateTime?
+  externalLink    String?
+  remarks         String?         @db.Text
+  aiSummary       String?         @db.Text
+  assignedUserId  String?
+  assignedUser    User?           @relation("TaskAssignee", fields: [assignedUserId], references: [id])
+  emailId         String?         @unique
+  email           Email?          @relation(fields: [emailId], references: [id], onDelete: SetNull)
+  attachments     Attachment[]
+  comments        Comment[]
+  statusHistory   StatusHistory[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([assignedUserId])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  filename  String
+  filePath  String   // Local storage path
+  fileType  String   // "PDF", "EXCEL", "OTHER"
+  fileSize  Int
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+model StatusHistory {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromStatus  String
+  toStatus    String
+  changedById String?
+  changedBy   User?    @relation(fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt   DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model AiLog {
+  id             String   @id @default(uuid())
+  emailMessageId String
+  prompt         String   @db.Text
+  rawResponse    String   @db.Text
+  status         String   // "SUCCESS", "FAILURE"
+  errorMsg       String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([emailMessageId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "NEW_INQUIRY", "NEW_COMMENT", "ASSIGNMENT", "STATUS_UPDATE"
+  title     String
+  message   String
+  relatedId String   // The task/inquiry ID
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+model Counter {
+  id        String   @id @default("inquiry_counter")
+  value     Int      @default(1000)
+  updatedAt DateTime @updatedAt
+}
