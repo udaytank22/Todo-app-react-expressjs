@@ -157,9 +157,9 @@ const Kanban = ({ socket, searchVal }) => {
       </div>
 
       {/* Drag & Drop Context */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-5 h-full">
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
+          <div className="flex gap-5 h-full w-max min-w-full">
             {COLUMNS.map((column) => {
               const colTasks = getTasksByColumn(column.id);
 
@@ -269,8 +269,8 @@ const Kanban = ({ socket, searchVal }) => {
               );
             })}
           </div>
-        </DragDropContext>
-      </div>
+        </div>
+      </DragDropContext>
     </div>
   );
 };

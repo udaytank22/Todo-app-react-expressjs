@@ -132,7 +132,22 @@ const getAllTasks = async (req, res) => {
     ) {
       try {
         const emails = await fetchEmails();
-        liveEmails = emails.map((email, index) => {
+        const emailIds = emails.map(e => Buffer.from(e.messageId).toString('hex'));
+
+        // Find existing tasks in the database with these hex IDs
+        const existingTasks = await prisma.task.findMany({
+          where: { id: { in: emailIds } },
+          select: { id: true },
+        });
+        const existingTaskIds = new Set(existingTasks.map(t => t.id));
+
+        // Filter out emails that are already persisted
+        const unpersistedEmails = emails.filter(e => {
+          const hexId = Buffer.from(e.messageId).toString('hex');
+          return !existingTaskIds.has(hexId);
+        });
+
+        liveEmails = unpersistedEmails.map((email, index) => {
           const inqRegex = /INQ-\d+/i;
           const subjectMatch = email.subject ? email.subject.match(inqRegex) : null;
           const bodyMatch = email.body ? email.body.match(inqRegex) : null;

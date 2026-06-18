@@ -90,7 +90,7 @@
 
   /* Kanban board custom styling */
   .kanban-column {
-    @apply flex flex-col w-80 min-w-80 rounded-2xl p-4 transition-all duration-200;
+    @apply flex flex-col w-80 min-w-80 shrink-0 rounded-2xl p-4 transition-all duration-200;
     background: rgba(15, 23, 42, 0.45);
     border: 1px solid rgba(255, 255, 255, 0.04);
   }
