@@ -13,6 +13,7 @@ import Kanban from './pages/Kanban';
 import List from './pages/List';
 import InquiryDetails from './pages/InquiryDetails';
 import Notifications from './pages/Notifications';
+import CustomerAssignments from './pages/CustomerAssignments';
 import { Mail, X, Bell, MessageSquare } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { fetchTasks, addInquiryLocal, updateStatusLocal, updateTaskLocal, removeTaskLocal, addCommentLocal } from './store/tasksSlice';
@@ -279,6 +280,7 @@ const AppContent = () => {
           <Route path="/list" element={<List socket={socket} searchVal={searchVal} />} />
           <Route path="/inquiry/:id" element={<InquiryDetails />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/assignments" element={<CustomerAssignments />} />
         </Route>
 
         {/* Fallback redirects */}

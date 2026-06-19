@@ -170,9 +170,6 @@ const fetchRealOutlookEmails = async () => {
 
     for (const msg of messages) {
       const subject = msg.subject || '';
-      if (!subject.toLowerCase().includes('inquiry')) {
-        continue;
-      }
 
       const email = {
         messageId: msg.id,

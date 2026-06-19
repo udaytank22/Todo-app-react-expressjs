@@ -340,60 +340,40 @@ const InquiryDetails = () => {
                   Attachments
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {task.attachments.map((file) => {
-                    const isPreviewable = ['PDF', 'EXCEL'].includes(file.fileType);
-                    return (
-                      <div
-                        key={file.id}
-                        onClick={() => {
-                          if (isPreviewable) {
-                            setPreviewAttachment(file);
-                            handleLoadAttachmentPreview(file);
-                          }
-                        }}
-                        className={`flex items-center justify-between p-3 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-white/5 transition-all text-xs group ${isPreviewable ? 'cursor-pointer' : ''
-                          }`}
-                      >
-                        <div className="flex items-center gap-2.5 overflow-hidden flex-1 mr-2">
-                          {file.fileType === 'EXCEL' ? (
-                            <FileSpreadsheet className="h-4 w-4 text-emerald-500 min-w-4" />
-                          ) : file.fileType === 'PDF' ? (
-                            <FileText className="h-4 w-4 text-rose-500 min-w-4" />
-                          ) : (
-                            <FileText className="h-4 w-4 text-slate-500 min-w-4" />
-                          )}
-                          <span className="text-slate-300 truncate font-sans font-semibold group-hover:text-sky-400 transition-colors">
-                            {file.filename}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-slate-500 font-sans text-[10px]">
-                            {Math.round(file.fileSize / 1024)} KB
-                          </span>
-                          {isPreviewable && (
-                            <button
-                              type="button"
-                              className="text-slate-500 hover:text-sky-400 p-1 rounded transition-colors"
-                              title="Preview in modal"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          <a
-                            href={`/api/tasks/attachments/${file.id}/view?token=${localStorage.getItem('token') || ''}`}
-                            download={file.filename}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-slate-500 hover:text-slate-200 transition-colors flex items-center p-1"
-                            title="Download attachment"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
+                  {task.attachments.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-white/5 transition-all text-xs group text-slate-300"
+                    >
+                      <div className="flex items-center gap-2.5 overflow-hidden flex-1 mr-2">
+                        {file.fileType === 'EXCEL' ? (
+                          <FileSpreadsheet className="h-4 w-4 text-emerald-500 min-w-4" />
+                        ) : file.fileType === 'PDF' ? (
+                          <FileText className="h-4 w-4 text-rose-500 min-w-4" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-slate-500 min-w-4" />
+                        )}
+                        <span className="truncate font-sans font-semibold">
+                          {file.filename}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-slate-500 font-sans text-[10px]">
+                          {Math.round(file.fileSize / 1024)} KB
+                        </span>
+                        <a
+                          href={`/api/tasks/attachments/${file.id}/view?token=${localStorage.getItem('token') || ''}`}
+                          download={file.filename}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-500 hover:text-slate-200 transition-colors flex items-center p-1"
+                          title="Download attachment"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -573,82 +553,6 @@ const InquiryDetails = () => {
             </div>
           </Card>
 
-          {/* Card 2: Interactive File Parsers Viewer */}
-          {(pdfAtt || excelAtt) && (
-            <Card className="space-y-4">
-              {/* Tab Header buttons */}
-              <div className="flex border-b border-white/5">
-                {pdfAtt && (
-                  <button
-                    onClick={() => {
-                      setActiveTab('pdf');
-                      handleLoadAttachmentPreview(pdfAtt);
-                    }}
-                    className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 outline-none transition-all ${activeTab === 'pdf'
-                      ? 'border-rose-500 text-rose-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-300'
-                      }`}
-                  >
-                    PDF Specification
-                  </button>
-                )}
-
-                {excelAtt && (
-                  <button
-                    onClick={() => {
-                      setActiveTab('excel');
-                      handleLoadAttachmentPreview(excelAtt);
-                    }}
-                    className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 outline-none transition-all ${activeTab === 'excel'
-                      ? 'border-emerald-500 text-emerald-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-300'
-                      }`}
-                  >
-                    Excel Data Grid
-                  </button>
-                )}
-              </div>
-
-              {/* Tab Content panels */}
-              <div className="pt-2">
-                {activeTab === 'overview' && (
-                  <p className="text-slate-500 text-xs text-center py-6">
-                    Select a tab above to parse and view attachment contents.
-                  </p>
-                )}
-
-                {/* PDF Content pre text viewer */}
-                {activeTab === 'pdf' && pdfAtt && (
-                  <div className="space-y-3">
-                    {parsingLoading[pdfAtt.id] ? (
-                      <div className="py-10 flex flex-col items-center justify-center text-xs text-slate-500">
-                        <div className="h-6 w-6 rounded-full border-2 border-rose-500/10 border-t-rose-500 animate-spin mb-2" />
-                        <span>Parsing PDF contents...</span>
-                      </div>
-                    ) : (
-                      <div className="bg-slate-900/60 p-4 border border-white/5 rounded-xl max-h-[300px] overflow-y-auto text-xs text-slate-400 font-sans leading-relaxed whitespace-pre-wrap">
-                        {parsedFiles[pdfAtt.id] || 'No content parsed.'}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Excel Content tabular visualizer */}
-                {activeTab === 'excel' && excelAtt && (
-                  <div className="space-y-3">
-                    {parsingLoading[excelAtt.id] ? (
-                      <div className="py-10 flex flex-col items-center justify-center text-xs text-slate-500">
-                        <div className="h-6 w-6 rounded-full border-2 border-emerald-500/10 border-t-emerald-500 animate-spin mb-2" />
-                        <span>Structuring Excel tables...</span>
-                      </div>
-                    ) : (
-                      renderExcelGridTable(parsedFiles[excelAtt.id])
-                    )}
-                  </div>
-                )}
-              </div>
-            </Card>
-          )}
 
         </div>
 

@@ -8,17 +8,18 @@ generator client {
 }
 
 model User {
-  id            String          @id @default(uuid())
-  email         String          @unique
-  password      String
-  name          String
-  role          String          // "ADMIN", "MANAGER", "STAFF"
-  tasksAssigned Task[]          @relation("TaskAssignee")
-  comments      Comment[]
-  statusLogs    StatusHistory[]
-  notifications Notification[]  @relation("UserNotifications")
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  password            String
+  name                String
+  role                String               // "ADMIN", "MANAGER", "STAFF"
+  tasksAssigned       Task[]               @relation("TaskAssignee")
+  comments            Comment[]
+  statusLogs          StatusHistory[]
+  notifications       Notification[]       @relation("UserNotifications")
+  customerAssignments CustomerAssignment[] @relation("CustomerAssignmentUser")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model Email {
@@ -134,3 +135,16 @@ model Counter {
   value     Int      @default(1000)
   updatedAt DateTime @updatedAt
 }
+
+model CustomerAssignment {
+  id              String   @id @default(uuid())
+  customerName    String?
+  customerEmail   String?
+  assignedUserId  String
+  assignedUser    User     @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([customerName, customerEmail])
+}
+

@@ -12,10 +12,12 @@ const authRoutes = require('./routes/authRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const customerAssignmentRoutes = require('./routes/customerAssignmentRoutes');
 
 const { isConnected, fetchEmails } = require('./services/outlook');
 const { emitNewInquiry, emitNewNotification } = require('./services/socket');
 const prisma = require('./services/db');
+const { findAssignedUser } = require('./utils/assignmentEngine');
 
 const app = express();
 const server = http.createServer(app);
@@ -66,6 +68,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/customer-assignments', customerAssignmentRoutes);
 
 // 404 Route handler
 app.use((req, res, next) => {
@@ -159,7 +162,129 @@ const startEmailAutoSync = () => {
               }
             };
 
-            logToFile(`[Auto Sync] Emitting new inquiry: ${inquiryId} - ${email.subject}`);
+            // Check if there is an auto-assignment rule match
+            const matchedUserId = await findAssignedUser(email.senderEmail, email.senderName);
+            if (matchedUserId) {
+              try {
+                logToFile(`[Auto Sync] Rule matched! Automatically persisting and assigning email from ${email.senderEmail} to user ${matchedUserId}`);
+                
+                // 1. Create Email record
+                let emailRecord = await prisma.email.findUnique({
+                  where: { messageId: email.messageId }
+                });
+                if (!emailRecord) {
+                  emailRecord = await prisma.email.create({
+                    data: {
+                      messageId: email.messageId,
+                      subject: email.subject || '(No Subject)',
+                      senderEmail: email.senderEmail,
+                      senderName: email.senderName,
+                      body: email.body || '',
+                      receivedAt: email.receivedAt,
+                      processedStatus: 'PROCESSED',
+                    }
+                  });
+                }
+
+                // 2. Generate inquiry ID
+                const { generateInquiryId } = require('./utils/idGenerator');
+                const finalInquiryId = await generateInquiryId();
+
+                // 3. Create Task
+                const taskId = Buffer.from(email.messageId).toString('hex');
+                const task = await prisma.task.create({
+                  data: {
+                    id: taskId,
+                    inquiryId: finalInquiryId,
+                    subject: email.subject || '(No Subject)',
+                    customerName: email.senderName,
+                    senderEmail: email.senderEmail,
+                    description: email.body || '',
+                    status: 'NEW_EMAIL',
+                    priority: 'MEDIUM',
+                    emailId: emailRecord.id,
+                    assignedUserId: matchedUserId,
+                    createdAt: email.receivedAt,
+                    updatedAt: email.receivedAt,
+                  },
+                  include: {
+                    assignedUser: {
+                      select: { id: true, name: true, email: true, role: true },
+                    },
+                  }
+                });
+
+                // 4. Create initial Status History
+                await prisma.statusHistory.create({
+                  data: {
+                    taskId: task.id,
+                    fromStatus: 'NONE',
+                    toStatus: 'NEW_EMAIL',
+                    changedById: null, // Auto assignment
+                  }
+                });
+
+                // 5. Save attachments to disk & DB
+                if (email.attachments && email.attachments.length > 0) {
+                  const { fetchLiveAttachment } = require('./services/outlook');
+                  for (const att of email.attachments) {
+                    try {
+                      const attData = await fetchLiveAttachment(email.messageId, att.id);
+                      const buffer = Buffer.from(attData.contentBytes, 'base64');
+                      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                      const ext = path.extname(attData.name) || '';
+                      const filename = uniqueSuffix + ext;
+                      const uploadDir = path.join(__dirname, '../uploads');
+                      if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
+                      }
+                      const filePath = path.join(uploadDir, filename);
+                      fs.writeFileSync(filePath, buffer);
+
+                      await prisma.attachment.create({
+                        data: {
+                          filename: attData.name,
+                          filePath: `uploads/${filename}`,
+                          fileType: attData.name.toLowerCase().endsWith('.pdf') ? 'PDF' : ((attData.name.toLowerCase().endsWith('.xlsx') || attData.name.toLowerCase().endsWith('.xls')) ? 'EXCEL' : 'OTHER'),
+                          fileSize: attData.size,
+                          taskId: task.id,
+                        }
+                      });
+                    } catch (attErr) {
+                      logToFile(`[Auto Sync] Failed to save attachment for task ${task.inquiryId}: ${attErr.message}`);
+                    }
+                  }
+                }
+
+                // Update notification & socket payload with the persisted task details
+                taskObj.inquiryId = finalInquiryId;
+                taskObj.assignedUserId = matchedUserId;
+                taskObj.assignedUser = task.assignedUser;
+
+                // Send assignment notification to employee
+                await prisma.notification.create({
+                  data: {
+                    userId: matchedUserId,
+                    type: 'ASSIGNMENT',
+                    title: 'New Inquiry Automatically Assigned',
+                    message: `Inquiry ${finalInquiryId} from ${email.senderName} has been automatically assigned to you.`,
+                    relatedId: task.id,
+                  }
+                });
+                const assignmentNotif = await prisma.notification.findFirst({
+                  where: { relatedId: task.id, type: 'ASSIGNMENT' },
+                  orderBy: { createdAt: 'desc' },
+                });
+                if (assignmentNotif) {
+                  emitNewNotification(assignmentNotif);
+                }
+
+              } catch (persistErr) {
+                logToFile(`[Auto Sync] Failed to auto-persist matching assignment task: ${persistErr.message}`);
+              }
+            }
+
+            logToFile(`[Auto Sync] Emitting new inquiry: ${taskObj.inquiryId} - ${email.subject}`);
             // Notify all connected socket clients about the new email in real-time
             emitNewInquiry(taskObj);
 

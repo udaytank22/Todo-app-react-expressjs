@@ -9,7 +9,8 @@ import {
   LogOut,
   Shield,
   User as UserIcon,
-  Bell
+  Bell,
+  Workflow
 } from 'lucide-react';
 
 const Sidebar = ({ isMailConnected, isDemoMode }) => {
@@ -56,6 +57,15 @@ const Sidebar = ({ isMailConnected, isDemoMode }) => {
           </div>
           <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Task Grid List</span>
         </NavLink>
+
+        {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+          <NavLink to="/assignments" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 px-0 group-hover:px-4 py-3 overflow-hidden">
+            <div className="flex items-center justify-center min-w-[24px] h-5">
+              <Workflow className="h-5 w-5 flex-shrink-0" />
+            </div>
+            <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Auto Assignments</span>
+          </NavLink>
+        )}
 
         <NavLink to="/notifications" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 px-0 group-hover:px-4 py-3 overflow-hidden relative">
           <div className="flex items-center justify-center min-w-[24px] h-5 relative">

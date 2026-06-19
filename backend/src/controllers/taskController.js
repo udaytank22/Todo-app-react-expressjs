@@ -5,6 +5,7 @@ const { emitNewInquiry, emitStatusUpdate, emitTaskAssigned, emitNewComment, emit
 const { extractTextFromPDF, extractTextFromExcel } = require('../services/gemini');
 const { isConnected, fetchEmails } = require('../services/outlook');
 const { generateInquiryId } = require('../utils/idGenerator');
+const { findAssignedUser } = require('../utils/assignmentEngine');
 
 /**
  * Helper to create and broadcast a notification to a specific user
@@ -103,31 +104,11 @@ const getAllTasks = async (req, res) => {
     const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const safeSortOrder = sortOrder === 'asc' ? 'asc' : 'desc';
 
-    // --- Execute count + findMany in parallel ---
-    const [total, dbTasks] = await Promise.all([
-      prisma.task.count({ where }),
-      prisma.task.findMany({
-        where,
-        include: {
-          assignedUser: {
-            select: { id: true, name: true, email: true, role: true },
-          },
-          _count: {
-            select: { attachments: true, comments: true },
-          },
-        },
-        orderBy: { [safeSortBy]: safeSortOrder },
-        skip,
-        take: limitNum,
-      }),
-    ]);
-
-    // --- Append live Outlook emails only on page 1 with no filters ---
+    // --- Fetch live Outlook emails if conditions are met ---
     let liveEmails = [];
     if (
       req.user.role !== 'STAFF' &&
       isConnected() &&
-      pageNum === 1 &&
       !status && !priority && !search && !customer
     ) {
       try {
@@ -180,13 +161,63 @@ const getAllTasks = async (req, res) => {
       }
     }
 
+    // --- Pagination math for combined list ---
+    const L = liveEmails.length;
+    const startIdx = (pageNum - 1) * limitNum;
+    const endIdx = pageNum * limitNum;
+
+    let pageLiveEmails = [];
+    let dbSkip = 0;
+    let dbTake = limitNum;
+
+    if (startIdx < L) {
+      pageLiveEmails = liveEmails.slice(startIdx, Math.min(endIdx, L));
+      const takenL = pageLiveEmails.length;
+      dbSkip = 0;
+      dbTake = limitNum - takenL;
+    } else {
+      pageLiveEmails = [];
+      dbSkip = startIdx - L;
+      dbTake = limitNum;
+    }
+
+    // --- Query Database ---
+    let dbTasks = [];
+    let total = 0;
+
+    if (dbTake > 0) {
+      const [dbTotal, queryTasks] = await Promise.all([
+        prisma.task.count({ where }),
+        prisma.task.findMany({
+          where,
+          include: {
+            assignedUser: {
+              select: { id: true, name: true, email: true, role: true },
+            },
+            _count: {
+              select: { attachments: true, comments: true },
+            },
+          },
+          orderBy: { [safeSortBy]: safeSortOrder },
+          skip: dbSkip,
+          take: dbTake,
+        }),
+      ]);
+      total = dbTotal;
+      dbTasks = queryTasks;
+    } else {
+      total = await prisma.task.count({ where });
+    }
+
+    const totalCombined = total + L;
+
     return res.json({
-      data: [...liveEmails, ...dbTasks],
+      data: [...pageLiveEmails, ...dbTasks],
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total: total + liveEmails.length,
-        totalPages: Math.ceil((total + liveEmails.length) / limitNum),
+        total: totalCombined,
+        totalPages: Math.ceil(totalCombined / limitNum),
       },
     });
   } catch (error) {
@@ -272,7 +303,7 @@ const getTaskById = async (req, res) => {
           attachments: matchedEmail.attachments ? matchedEmail.attachments.map((att) => ({
             id: Buffer.from(JSON.stringify({ m: matchedEmail.messageId, a: att.id })).toString('hex'),
             filename: att.filename,
-            fileType: att.filename.toLowerCase().endsWith('.pdf') ? 'PDF' : (att.filename.toLowerCase().endsWith('.xlsx') ? 'EXCEL' : 'OTHER'),
+            fileType: att.filename.toLowerCase().endsWith('.pdf') ? 'PDF' : ((att.filename.toLowerCase().endsWith('.xlsx') || att.filename.toLowerCase().endsWith('.xls')) ? 'EXCEL' : 'OTHER'),
             fileSize: att.fileSize,
             createdAt: matchedEmail.receivedAt,
           })) : [],
@@ -302,6 +333,12 @@ const createTask = async (req, res) => {
   try {
     const inquiryId = await generateInquiryId();
 
+    // Auto-assign if rule matches and no assignee is provided manually
+    let finalAssignedUserId = assignedUserId || null;
+    if (!finalAssignedUserId && senderEmail) {
+      finalAssignedUserId = await findAssignedUser(senderEmail, customerName);
+    }
+
     const task = await prisma.task.create({
       data: {
         inquiryId,
@@ -314,7 +351,7 @@ const createTask = async (req, res) => {
         dueDate: dueDate ? new Date(dueDate) : null,
         externalLink: externalLink || null,
         remarks: remarks || null,
-        assignedUserId: assignedUserId || null,
+        assignedUserId: finalAssignedUserId,
       },
       include: {
         assignedUser: {
@@ -426,6 +463,9 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
       // Generate custom inquiry ID
       const inquiryId = await generateInquiryId();
 
+      // Auto-assign rule check on database persistence
+      const matchedUserId = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
+
       // Create Task record
       const newTask = await prisma.task.create({
         data: {
@@ -438,10 +478,26 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
           status: 'NEW_EMAIL',
           priority: 'MEDIUM',
           emailId: emailRecord.id,
+          assignedUserId: matchedUserId || null,
           createdAt: matchedEmail.receivedAt,
           updatedAt: matchedEmail.receivedAt,
         }
       });
+
+      // Notification for auto-assignment if matched
+      if (matchedUserId) {
+        try {
+          await createAndEmitNotification(
+            matchedUserId,
+            'ASSIGNMENT',
+            'New Inquiry Automatically Assigned',
+            `You have been assigned inquiry ${newTask.inquiryId}: ${newTask.subject}`,
+            newTask.id
+          );
+        } catch (notifErr) {
+          console.error('Failed to create assignment notification in ensureLiveEmailPersisted:', notifErr);
+        }
+      }
 
       // Write initial status history log
       await prisma.statusHistory.create({
@@ -477,7 +533,7 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
               data: {
                 filename: attData.name,
                 filePath: `uploads/${filename}`,
-                fileType: attData.name.toLowerCase().endsWith('.pdf') ? 'PDF' : (attData.name.toLowerCase().endsWith('.xlsx') ? 'EXCEL' : 'OTHER'),
+                fileType: attData.name.toLowerCase().endsWith('.pdf') ? 'PDF' : ((attData.name.toLowerCase().endsWith('.xlsx') || attData.name.toLowerCase().endsWith('.xls')) ? 'EXCEL' : 'OTHER'),
                 fileSize: attData.size,
                 taskId: newTask.id,
               }
@@ -971,7 +1027,7 @@ const parseAttachment = async (req, res) => {
       const attData = await fetchLiveAttachment(liveInfo.messageId, liveInfo.attachmentId);
       buffer = Buffer.from(attData.contentBytes, 'base64');
       filename = attData.name;
-      fileType = filename.toLowerCase().endsWith('.pdf') ? 'PDF' : (filename.toLowerCase().endsWith('.xlsx') ? 'EXCEL' : 'OTHER');
+      fileType = filename.toLowerCase().endsWith('.pdf') ? 'PDF' : ((filename.toLowerCase().endsWith('.xlsx') || filename.toLowerCase().endsWith('.xls')) ? 'EXCEL' : 'OTHER');
     } else {
       const attachment = await prisma.attachment.findUnique({
         where: { id: attachmentId },

@@ -30,7 +30,7 @@ const Dashboard = () => {
   // Compute metrics
   const totalInquiries = tasks.length;
   const newEmails = tasks.filter(t => t.status === 'NEW_EMAIL').length;
-  const pendingTasks = tasks.filter(t => ['PENDING_REVIEW', 'IN_PROGRESS', 'WAITING_FOR_CLIENT'].includes(t.status)).length;
+  const pendingTasks = tasks.filter(t => t.status === 'PENDING_REVIEW').length;
   const completedTasks = tasks.filter(t => t.status === 'COMPLETED').length;
   const highPriority = tasks.filter(t => ['HIGH', 'URGENT'].includes(t.priority)).length;
 
