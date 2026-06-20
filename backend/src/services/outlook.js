@@ -42,11 +42,31 @@ const loadConfig = async () => {
  */
 const saveConfig = async (config) => {
   oauthConfig = { ...oauthConfig, ...config };
-  const redisClient = getPubClient();
-  if (redisClient && getIsRedisAvailable()) {
-    await redisClient.set(REDIS_OAUTH_KEY, JSON.stringify(oauthConfig));
-  } else {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(oauthConfig, null, 2));
+  
+  try {
+    const expiryTimeBigInt = oauthConfig.expiryTime ? BigInt(oauthConfig.expiryTime) : null;
+    await prisma.integrationToken.upsert({
+      where: { provider: 'outlook' },
+      update: {
+        accessToken: oauthConfig.accessToken || '',
+        refreshToken: oauthConfig.refreshToken || '',
+        expiryTime: expiryTimeBigInt,
+      },
+      create: {
+        provider: 'outlook',
+        accessToken: oauthConfig.accessToken || '',
+        refreshToken: oauthConfig.refreshToken || '',
+        expiryTime: expiryTimeBigInt,
+      }
+    });
+
+    // Optionally still cache it in Redis if available
+    const redisClient = getPubClient();
+    if (redisClient && getIsRedisAvailable()) {
+      await redisClient.set(REDIS_OAUTH_KEY, JSON.stringify(oauthConfig));
+    }
+  } catch (error) {
+    logger.error('Failed to save Outlook config to DB:', error.message);
   }
 };
 

@@ -73,10 +73,18 @@ const Navbar = ({ isMailConnected, isDemoMode, onSyncSuccess, searchVal, onSearc
               Connected
             </span>
           ) : (
-            <span className="text-rose-400 font-bold flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-              Offline
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-rose-400 font-bold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                Offline
+              </span>
+              <button 
+                onClick={handleConnectMail}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider transition-colors shadow-sm cursor-pointer"
+              >
+                Reconnect Microsoft
+              </button>
+            </div>
           )}
         </div>
 
