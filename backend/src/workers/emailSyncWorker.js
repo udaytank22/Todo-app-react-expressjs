@@ -6,6 +6,7 @@ const { fetchEmails, isConnected, fetchLiveAttachment } = require('../services/o
 const { emitNewInquiry, emitNewNotification } = require('../services/socket');
 const { findAssignedUser } = require('../services/customerAssignment');
 const { generateInquiryId } = require('../utils/idGenerator');
+const logger = require('../utils/logger');
 
 // Initialize Bull Queue
 // Bull uses Redis to distribute background jobs across worker processes
@@ -29,33 +30,28 @@ emailQueue.on('error', (err) => {
 });
 
 const prevEmailsMap = new Map();
-const logStream = fs.createWriteStream(path.join(__dirname, '../../sync.log'), { flags: 'a' });
-const logToFile = (msg) => {
-  const time = new Date().toISOString();
-  logStream.write(`[${time}] ${msg}\n`);
-};
 
 // Process jobs
 emailQueue.process(async (job) => {
   try {
     const connected = await isConnected();
     if (!connected) {
-      logToFile('[Bull Worker] Outlook not connected.');
+      logger.warn('[Bull Worker] Outlook not connected.');
       return;
     }
 
-    logToFile('[Bull Worker] Checking for emails...');
+    logger.info('[Bull Worker] Checking for emails...');
     const freshEmails = await fetchEmails(true);
-    logToFile(`[Bull Worker] Fetched ${freshEmails.length} emails.`);
+    logger.info(`[Bull Worker] Fetched ${freshEmails.length} emails.`);
 
     if (prevEmailsMap.size === 0) {
       freshEmails.forEach(e => prevEmailsMap.set(e.messageId, true));
-      logToFile(`[Bull Worker] Initialized. Monitoring ${freshEmails.length} existing messages.`);
+      logger.info(`[Bull Worker] Initialized. Monitoring ${freshEmails.length} existing messages.`);
       return;
     }
 
     const newEmails = freshEmails.filter(e => !prevEmailsMap.has(e.messageId));
-    logToFile(`[Bull Worker] Found ${newEmails.length} new email(s).`);
+    logger.info(`[Bull Worker] Found ${newEmails.length} new email(s).`);
 
     if (newEmails.length > 0) {
       for (const email of newEmails) {
@@ -232,14 +228,14 @@ emailQueue.process(async (job) => {
           }
         } catch (notifErr) {
           logToFile(`[Bull Worker] Failed to create notification: ${notifErr.message}`);
+          logger.error(`[Bull Worker] Failed to create notification: ${notifErr.message}`);
         }
 
         prevEmailsMap.set(email.messageId, true);
       }
     }
-  } catch (err) {
-    logToFile(`[Bull Worker] Job failed: ${err.message}`);
-    throw err;
+  } catch (error) {
+    logger.error(`[Bull Worker] Sync failed: ${error.message}`);
   }
 });
 

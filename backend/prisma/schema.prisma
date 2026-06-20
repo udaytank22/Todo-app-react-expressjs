@@ -166,3 +166,10 @@ model CustomerAssignment {
   @@unique([customerName, customerEmail])
 }
 
+model IntegrationToken {
+  provider     String   @id
+  accessToken  String   @db.Text
+  refreshToken String?  @db.Text
+  expiryTime   BigInt?
+  updatedAt    DateTime @updatedAt
+}

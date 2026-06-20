@@ -1,12 +1,10 @@
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
 const { createCircuitBreaker } = require('../utils/circuitBreaker');
 const logger = require('../utils/logger');
+const { prisma } = require('./db');
 
 const { getPubClient, getIsRedisAvailable } = require('./redis');
 
-const CONFIG_PATH = path.join(__dirname, '../../config.json');
 const REDIS_OAUTH_KEY = 'outlook:oauth:tokens';
 
 // In-memory fallback
@@ -16,25 +14,32 @@ let oauthConfig = {
   expiryTime: null,
 };
 
+/**
+ * Load config from Postgres
+ */
 const loadConfig = async () => {
-  const redisClient = getPubClient();
-  if (redisClient && getIsRedisAvailable()) {
-    const data = await redisClient.get(REDIS_OAUTH_KEY);
-    if (data) {
-      oauthConfig = JSON.parse(data);
-      return;
+  try {
+    const tokenRecord = await prisma.integrationToken.findUnique({
+      where: { provider: 'outlook' }
+    });
+    
+    if (tokenRecord) {
+      oauthConfig = {
+        accessToken: tokenRecord.accessToken,
+        refreshToken: tokenRecord.refreshToken,
+        expiryTime: tokenRecord.expiryTime ? Number(tokenRecord.expiryTime) : null,
+      };
+    } else {
+      oauthConfig = { accessToken: null, refreshToken: null, expiryTime: null };
     }
-  }
-  // Fallback to file
-  if (fs.existsSync(CONFIG_PATH)) {
-    try {
-      oauthConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    } catch (err) {
-      console.error('Error loading config.json:', err.message);
-    }
+  } catch (error) {
+    logger.error('Failed to load Outlook config from DB:', error.message);
   }
 };
 
+/**
+ * Save config to Postgres
+ */
 const saveConfig = async (config) => {
   oauthConfig = { ...oauthConfig, ...config };
   const redisClient = getPubClient();

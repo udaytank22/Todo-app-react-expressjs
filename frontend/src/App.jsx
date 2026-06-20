@@ -111,9 +111,7 @@ const AppContent = () => {
 
     newSocket.on('connect', () => {
       console.log('[Socket] Connected to server web socket');
-      if (user && user.id) {
-        newSocket.emit('join', user.id);
-      }
+      // Explicit join is no longer needed; backend auto-joins based on JWT token.
     });
 
     // Listen for real-time app notifications

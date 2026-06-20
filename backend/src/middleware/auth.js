@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../services/db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_change_me_in_production';
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL ERROR: JWT_SECRET environment variable is not set.');
+  process.exit(1);
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // In-memory fallback if Redis is unavailable
 const fallbackCache = new Map();

@@ -1,7 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_change_me_in_production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 let io = null;
 
@@ -77,12 +77,9 @@ const initSocket = (server, pubClient = null, subClient = null) => {
     socket.join(`role_${socket.userRole}`);
 
     // Keep backward compatibility with clients that still emit 'join' explicitly.
-    // Only allow joining own room to prevent spoofing.
-    socket.on('join', (userId) => {
-      if (userId === socket.userId) {
-        socket.join(`user_${userId}`);
-        console.log(`[Socket.IO] Client ${socket.id} joined room user_${userId} (explicit join event)`);
-      }
+    // Explicit joins from clients are ignored in favor of the JWT derived ID.
+    socket.on('join', () => {
+      console.log(`[Socket.IO] Ignored client-supplied join for ${socket.id}. Auto-joined from token instead.`);
     });
 
     socket.on('disconnect', (reason) => {
