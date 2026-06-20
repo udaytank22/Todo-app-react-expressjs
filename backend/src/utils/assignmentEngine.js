@@ -1,4 +1,4 @@
-const prisma = require('../services/db');
+const { prisma } = require('../services/db');
 
 /**
  * Match a client email and customer name against auto-assignment rules and return the assignedUserId if matched

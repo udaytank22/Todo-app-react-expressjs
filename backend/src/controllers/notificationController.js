@@ -1,4 +1,4 @@
-const prisma = require('../services/db');
+const { prisma } = require('../services/db');
 
 const getNotifications = async (req, res) => {
   const { page = '1', limit = '50' } = req.query;

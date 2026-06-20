@@ -1,11 +1,17 @@
-const prisma = require('../services/db');
+const { prisma, prismaRead } = require('../services/db');
+const { cache } = require('../services/cache');
 
 /**
  * Get all auto-assignment rules
  */
 const getAllRules = async (req, res) => {
   try {
-    const rules = await prisma.customerAssignment.findMany({
+    const cachedRules = await cache.get('assignment_rules');
+    if (cachedRules) {
+      return res.json(cachedRules);
+    }
+
+    const rules = await prismaRead.customerAssignment.findMany({
       include: {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
@@ -13,6 +19,8 @@ const getAllRules = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    await cache.set('assignment_rules', rules, 300); // 5 min TTL
     return res.json(rules);
   } catch (error) {
     console.error('Error fetching assignment rules:', error);
@@ -72,6 +80,7 @@ const createRule = async (req, res) => {
       },
     });
 
+    await cache.invalidate('assignment_rules');
     return res.status(201).json(rule);
   } catch (error) {
     console.error('Error creating assignment rule:', error);
@@ -98,7 +107,8 @@ const deleteRule = async (req, res) => {
       where: { id },
     });
 
-    return res.json({ message: 'Auto-assignment rule deleted successfully.' });
+    await cache.invalidate('assignment_rules');
+    return res.json({ message: 'Assignment rule deleted successfully.' });
   } catch (error) {
     console.error('Error deleting assignment rule:', error);
     return res.status(500).json({ error: 'Server error deleting auto-assignment rule.' });

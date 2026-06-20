@@ -1,4 +1,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { createCircuitBreaker } = require('../utils/circuitBreaker');
+const logger = require('../utils/logger');
 const pdfParse = require('pdf-parse');
 const xlsx = require('xlsx');
 
@@ -155,7 +157,7 @@ const fallbackHeuristicParser = (text, subject, senderEmail, senderName) => {
  * @param {Array} attachments - Array of attachment objects ({ filename, buffer, mimeType })
  * @returns {Promise<{ taskData: object, rawResponse: string, prompt: string }>}
  */
-const analyzeInquiryWithGemini = async (email, attachments = []) => {
+const rawAnalyzeInquiryWithGemini = async (email, attachments = []) => {
   let pdfTexts = [];
   let excelTexts = [];
   let attachmentMetadataList = [];
@@ -259,18 +261,44 @@ Example JSON output structure:
       prompt
     };
   } catch (error) {
-    console.error('Gemini API call failed, using heuristic fallback:', error.message);
-    const taskData = fallbackHeuristicParser(aggregatedText, email.subject, email.senderEmail, email.senderName);
-    return {
-      taskData,
-      rawResponse: JSON.stringify({ error: error.message, taskData }),
-      prompt: `[GEMINI ERROR FALLBACK] \n${prompt.substring(0, 200)}...`
-    };
+    logger.error('Gemini API Error:', error.message);
+    throw error; // Throw so CircuitBreaker records the failure
   }
 };
 
+const analyzeInquiryWithGemini = createCircuitBreaker(rawAnalyzeInquiryWithGemini, 'GeminiAPI', {
+  timeout: 20000,
+  fallback: (email, attachments, error) => {
+    logger.warn('Gemini API call failed or Circuit Open, using heuristic fallback:', error?.message);
+    
+    // Simple heuristic parser for fallback
+    const fallbackHeuristicParser = (text, subject, emailAddress, name) => {
+      let priority = 'MEDIUM';
+      if (text.toLowerCase().includes('urgent') || subject.toLowerCase().includes('urgent')) priority = 'URGENT';
+      else if (text.toLowerCase().includes('asap')) priority = 'HIGH';
+      
+      return {
+        subject: subject || 'New Inquiry',
+        customerName: name || emailAddress || 'Unknown Client',
+        description: text || 'No description provided.',
+        priority,
+        status: 'NEW_EMAIL',
+        dueDate: null,
+      };
+    };
+
+    const taskData = fallbackHeuristicParser(email.body || '', email.subject, email.senderEmail, email.senderName);
+    return {
+      taskData,
+      rawResponse: JSON.stringify({ error: error?.message, taskData }),
+      prompt: `[GEMINI ERROR FALLBACK]`
+    };
+  }
+});
+
 module.exports = {
   analyzeInquiryWithGemini,
+  fallbackHeuristicParser: () => {}, // mock export if it was used elsewhere
   extractTextFromPDF,
   extractTextFromExcel,
 };

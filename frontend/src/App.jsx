@@ -7,14 +7,16 @@ import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Kanban from './pages/Kanban';
-import List from './pages/List';
-import InquiryDetails from './pages/InquiryDetails';
-import Notifications from './pages/Notifications';
-import CustomerAssignments from './pages/CustomerAssignments';
-import { Mail, X, Bell, MessageSquare } from 'lucide-react';
+import { Suspense, lazy } from 'react';
+import { Mail, X, Bell, MessageSquare, Loader } from 'lucide-react';
+
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Kanban = lazy(() => import('./pages/Kanban'));
+const List = lazy(() => import('./pages/List'));
+const InquiryDetails = lazy(() => import('./pages/InquiryDetails'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const CustomerAssignments = lazy(() => import('./pages/CustomerAssignments'));
 import { useDispatch } from 'react-redux';
 import { fetchTasks, addInquiryLocal, updateStatusLocal, updateTaskLocal, removeTaskLocal, addCommentLocal } from './store/tasksSlice';
 import { fetchNotifications, addNotificationLocal } from './store/notificationsSlice';
@@ -39,7 +41,13 @@ const MainLayout = ({ socket, onSyncSuccess, searchVal, onSearchChange, isMailCo
 
         {/* Content Area */}
         <main className="flex-1 overflow-hidden bg-slate-950/20">
-          <Outlet />
+          <Suspense fallback={
+            <div className="flex h-full w-full items-center justify-center">
+              <Loader className="h-8 w-8 text-indigo-500 animate-spin" />
+            </div>
+          }>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>
@@ -94,8 +102,11 @@ const AppContent = () => {
     }
 
     // Connect socket (Vite proxies this to backend)
+    // Phase 1: Pass JWT token in auth so the backend socket middleware can
+    // verify the connection before admitting the client.
     const newSocket = io(window.location.origin, {
       transports: ['websocket'],
+      auth: { token },
     });
 
     newSocket.on('connect', () => {
@@ -256,36 +267,42 @@ const AppContent = () => {
 
   return (
     <Router>
-      <Routes>
-        {/* Public login page */}
-        <Route path="/login" element={<Login />} />
+      <Suspense fallback={
+        <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-slate-100">
+          <Loader className="h-10 w-10 text-indigo-500 animate-spin" />
+        </div>
+      }>
+        <Routes>
+          {/* Public login page */}
+          <Route path="/login" element={<Login />} />
 
-        {/* Protected app workspace routes */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <MainLayout
-                socket={socket}
-                isMailConnected={isMailConnected}
-                isDemoMode={isDemoMode}
-                onSyncSuccess={handleSyncSuccess}
-                searchVal={searchVal}
-                onSearchChange={setSearchVal}
-              />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/kanban" element={<Kanban socket={socket} searchVal={searchVal} />} />
-          <Route path="/list" element={<List socket={socket} searchVal={searchVal} />} />
-          <Route path="/inquiry/:id" element={<InquiryDetails />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/assignments" element={<CustomerAssignments />} />
-        </Route>
+          {/* Protected app workspace routes */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <MainLayout
+                  socket={socket}
+                  isMailConnected={isMailConnected}
+                  isDemoMode={isDemoMode}
+                  onSyncSuccess={handleSyncSuccess}
+                  searchVal={searchVal}
+                  onSearchChange={setSearchVal}
+                />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/kanban" element={<Kanban socket={socket} searchVal={searchVal} />} />
+            <Route path="/list" element={<List socket={socket} searchVal={searchVal} />} />
+            <Route path="/inquiry/:id" element={<InquiryDetails />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/assignments" element={<CustomerAssignments />} />
+          </Route>
 
-        {/* Fallback redirects */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Fallback redirects */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
 
       {/* Floating Toast Notification Center */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3.5 w-96 max-w-[calc(100vw-3rem)]">

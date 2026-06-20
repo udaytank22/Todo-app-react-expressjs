@@ -1,29 +1,50 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { createCircuitBreaker } = require('../utils/circuitBreaker');
+const logger = require('../utils/logger');
+
+const { getPubClient, getIsRedisAvailable } = require('./redis');
 
 const CONFIG_PATH = path.join(__dirname, '../../config.json');
+const REDIS_OAUTH_KEY = 'outlook:oauth:tokens';
 
-// In-memory OAuth status and configuration fallback
+// In-memory fallback
 let oauthConfig = {
   accessToken: null,
   refreshToken: null,
   expiryTime: null,
 };
 
-// Load saved configuration if it exists
-if (fs.existsSync(CONFIG_PATH)) {
-  try {
-    oauthConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-  } catch (err) {
-    console.error('Error loading config.json:', err.message);
+const loadConfig = async () => {
+  const redisClient = getPubClient();
+  if (redisClient && getIsRedisAvailable()) {
+    const data = await redisClient.get(REDIS_OAUTH_KEY);
+    if (data) {
+      oauthConfig = JSON.parse(data);
+      return;
+    }
   }
-}
-
-const saveConfig = (config) => {
-  oauthConfig = { ...oauthConfig, ...config };
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(oauthConfig, null, 2));
+  // Fallback to file
+  if (fs.existsSync(CONFIG_PATH)) {
+    try {
+      oauthConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    } catch (err) {
+      console.error('Error loading config.json:', err.message);
+    }
+  }
 };
+
+const saveConfig = async (config) => {
+  oauthConfig = { ...oauthConfig, ...config };
+  const redisClient = getPubClient();
+  if (redisClient && getIsRedisAvailable()) {
+    await redisClient.set(REDIS_OAUTH_KEY, JSON.stringify(oauthConfig));
+  } else {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(oauthConfig, null, 2));
+  }
+};
+
 
 /**
  * Generate Microsoft Graph OAuth authorization URL
@@ -70,7 +91,7 @@ const exchangeAuthCode = async (code) => {
     const { access_token, refresh_token, expires_in } = response.data;
     const expiryTime = Date.now() + (expires_in * 1000);
 
-    saveConfig({
+    await saveConfig({
       accessToken: access_token,
       refreshToken: refresh_token,
       expiryTime,
@@ -87,6 +108,7 @@ const exchangeAuthCode = async (code) => {
  * Get valid Microsoft Graph Access Token, refreshing if expired
  */
 const getAccessToken = async () => {
+  await loadConfig();
   if (!oauthConfig.accessToken) return null;
 
   // If token is expired or expires in next 60 seconds, refresh it
@@ -115,7 +137,7 @@ const getAccessToken = async () => {
       const { access_token, refresh_token, expires_in } = response.data;
       const expiryTime = Date.now() + (expires_in * 1000);
 
-      saveConfig({
+      await saveConfig({
         accessToken: access_token,
         refreshToken: refresh_token ? refresh_token : oauthConfig.refreshToken, // refresh_token might not always be returned
         expiryTime,
@@ -126,7 +148,7 @@ const getAccessToken = async () => {
     } catch (error) {
       console.error('Error refreshing token:', error.response?.data || error.message);
       // Reset tokens if refresh fails
-      saveConfig({ accessToken: null, refreshToken: null, expiryTime: null });
+      await saveConfig({ accessToken: null, refreshToken: null, expiryTime: null });
       return null;
     }
   }
@@ -137,10 +159,11 @@ const getAccessToken = async () => {
 /**
  * Check if the email connection is established and authorized
  */
-const isConnected = () => {
+const isConnected = async () => {
   if (process.env.DEMO_MODE === 'true') {
     return true; // Always active in demo mode
   }
+  await loadConfig();
   return !!oauthConfig.accessToken;
 };
 
@@ -235,7 +258,7 @@ let lastFetchTime = null;
 /**
  * Primary endpoint to fetch new emails (with in-memory caching)
  */
-const fetchEmails = async (forceRefresh = false) => {
+const rawFetchEmails = async (forceRefresh = false) => {
   if (forceRefresh || !cachedEmails) {
     console.log('[Outlook Service] Cache empty or force refresh requested. Fetching from Graph API...');
     cachedEmails = await fetchRealOutlookEmails();
@@ -245,6 +268,14 @@ const fetchEmails = async (forceRefresh = false) => {
   }
   return cachedEmails;
 };
+
+const fetchEmails = createCircuitBreaker(rawFetchEmails, 'OutlookGraphAPI', {
+  timeout: 10000,
+  fallback: () => {
+    logger.warn('Microsoft Graph API is down or timing out. Returning empty email array.');
+    return [];
+  }
+});
 
 module.exports = {
   getAuthUrl,

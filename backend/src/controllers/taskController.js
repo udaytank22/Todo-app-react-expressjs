@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
-const prisma = require('../services/db');
+const { prisma, prismaRead } = require('../services/db');
+const { cache } = require('../services/cache');
 const { emitNewInquiry, emitStatusUpdate, emitTaskAssigned, emitNewComment, emitNewNotification } = require('../services/socket');
 const { extractTextFromPDF, extractTextFromExcel } = require('../services/gemini');
 const { isConnected, fetchEmails } = require('../services/outlook');
@@ -69,6 +70,12 @@ const getAllTasks = async (req, res) => {
   } = req.query;
 
   try {
+    const cacheKey = `tasks:list:${req.user.role}:${req.user.id}:${Buffer.from(JSON.stringify(req.query)).toString('base64')}`;
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+
     // --- Build Prisma WHERE clause (SQL-level filtering) ---
     const where = {};
 
@@ -85,12 +92,13 @@ const getAllTasks = async (req, res) => {
       where.customerName = { contains: customer, mode: 'insensitive' };
     }
     if (search) {
+      const tsquery = search.trim().split(/\s+/).join(' | ');
       where.OR = [
-        { subject: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { senderEmail: { contains: search, mode: 'insensitive' } },
-        { inquiryId: { contains: search, mode: 'insensitive' } },
+        { subject: { search: tsquery } },
+        { description: { search: tsquery } },
+        { customerName: { search: tsquery } },
+        { senderEmail: { search: tsquery } },
+        { inquiryId: { search: tsquery } },
       ];
     }
 
@@ -111,15 +119,19 @@ const getAllTasks = async (req, res) => {
       isConnected() &&
       !status && !priority && !search && !customer
     ) {
-      try {
-        const emails = await fetchEmails();
-        const emailIds = emails.map(e => Buffer.from(e.messageId).toString('hex'));
+      const cachedLiveEmails = await cache.get('live_emails');
+      if (cachedLiveEmails) {
+        liveEmails = cachedLiveEmails;
+      } else {
+        try {
+          const emails = await fetchEmails();
+          const emailIds = emails.map(e => Buffer.from(e.messageId).toString('hex'));
 
-        // Find existing tasks in the database with these hex IDs
-        const existingTasks = await prisma.task.findMany({
-          where: { id: { in: emailIds } },
-          select: { id: true },
-        });
+          // Find existing tasks in the database with these hex IDs
+          const existingTasks = await prismaRead.task.findMany({
+            where: { id: { in: emailIds } },
+            select: { id: true },
+          });
         const existingTaskIds = new Set(existingTasks.map(t => t.id));
 
         // Filter out emails that are already persisted
@@ -156,8 +168,12 @@ const getAllTasks = async (req, res) => {
             }
           };
         });
+
+        // Cache live emails for 30s
+        await cache.set('live_emails', liveEmails, 30);
       } catch (err) {
         console.error('Error fetching live emails in getAllTasks:', err.message);
+      }
       }
     }
 
@@ -187,8 +203,8 @@ const getAllTasks = async (req, res) => {
 
     if (dbTake > 0) {
       const [dbTotal, queryTasks] = await Promise.all([
-        prisma.task.count({ where }),
-        prisma.task.findMany({
+        prismaRead.task.count({ where }),
+        prismaRead.task.findMany({
           where,
           include: {
             assignedUser: {
@@ -206,12 +222,11 @@ const getAllTasks = async (req, res) => {
       total = dbTotal;
       dbTasks = queryTasks;
     } else {
-      total = await prisma.task.count({ where });
+      total = await prismaRead.task.count({ where });
     }
 
     const totalCombined = total + L;
-
-    return res.json({
+    const responseData = {
       data: [...pageLiveEmails, ...dbTasks],
       pagination: {
         page: pageNum,
@@ -219,7 +234,12 @@ const getAllTasks = async (req, res) => {
         total: totalCombined,
         totalPages: Math.ceil(totalCombined / limitNum),
       },
-    });
+    };
+
+    // Cache the paginated result for 30s
+    await cache.set(cacheKey, responseData, 30);
+
+    return res.json(responseData);
   } catch (error) {
     console.error('Fetch tasks error:', error);
     return res.status(500).json({ error: 'Server error fetching tasks.' });
@@ -234,7 +254,7 @@ const getTaskById = async (req, res) => {
 
   try {
     // 1. Try finding in the database first
-    const task = await prisma.task.findUnique({
+    const task = await prismaRead.task.findUnique({
       where: { id },
       include: {
         assignedUser: {
@@ -402,6 +422,9 @@ const createTask = async (req, res) => {
       console.error('Failed to create notifications for manual task:', notifError);
     }
 
+    // Invalidating list cache
+    await cache.invalidate('tasks:list:*');
+
     return res.status(201).json(task);
   } catch (error) {
     console.error('Create task error:', error);
@@ -526,7 +549,8 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
               fs.mkdirSync(uploadDir, { recursive: true });
             }
             const filePath = path.join(uploadDir, filename);
-            fs.writeFileSync(filePath, buffer);
+            // ✅ Phase 1: Non-blocking async write — does not block the event loop
+            await fs.promises.writeFile(filePath, buffer);
 
             // Save attachment metadata in DB
             await prisma.attachment.create({
@@ -682,6 +706,10 @@ const updateTask = async (req, res) => {
       }
     }
 
+    // Invalidate caches
+    await cache.invalidate('tasks:list:*');
+    await cache.invalidate(`task:${id}`);
+
     return res.json(updatedTask);
   } catch (error) {
     console.error('Update task error:', error);
@@ -766,6 +794,10 @@ const updateTaskStatus = async (req, res) => {
       console.error('Failed to create status change notifications in updateTaskStatus:', notifErr);
     }
 
+    // Invalidate caches
+    await cache.invalidate('tasks:list:*');
+    await cache.invalidate(`task:${id}`);
+
     return res.json(updatedTask);
   } catch (error) {
     console.error('Update status error:', error);
@@ -806,6 +838,11 @@ const deleteTask = async (req, res) => {
     }
 
     await prisma.task.delete({ where: { id } });
+
+    // Invalidate caches
+    await cache.invalidate('tasks:list:*');
+    await cache.invalidate(`task:${id}`);
+
     return res.json({ message: 'Task and all related items deleted successfully.' });
   } catch (error) {
     console.error('Delete task error:', error);
@@ -890,6 +927,10 @@ const addComment = async (req, res) => {
       console.error('Failed to create notifications for comment:', notifErr);
     }
 
+    // Invalidate caches
+    await cache.invalidate('tasks:list:*');
+    await cache.invalidate(`task:${id}`);
+
     return res.status(201).json(comment);
   } catch (error) {
     console.error('Add comment error:', error);
@@ -927,15 +968,23 @@ const addAttachment = async (req, res) => {
     if (isPDF) fileType = 'PDF';
     else if (isExcel) fileType = 'EXCEL';
 
+    const { uploadFile } = require('../services/storage');
+    // Multer now uses memoryStorage, so file.buffer is the file content
+    const filePath = await uploadFile(file.buffer, file.originalname);
+
     const attachment = await prisma.attachment.create({
       data: {
         filename: file.originalname,
-        filePath: file.path,
+        filePath: filePath,
         fileType,
         fileSize: file.size,
         taskId: id,
       },
     });
+
+    // Invalidate caches
+    await cache.invalidate('tasks:list:*');
+    await cache.invalidate(`task:${id}`);
 
     return res.status(201).json(attachment);
   } catch (error) {
@@ -984,13 +1033,9 @@ const getAttachmentFile = async (req, res) => {
       return res.status(404).json({ error: 'Attachment not found.' });
     }
 
-    const fullPath = path.resolve(attachment.filePath);
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ error: 'Attachment file not found on server disk.' });
-    }
-
-    // Stream the file back
-    return res.sendFile(fullPath);
+    const { getFileUrl } = require('../services/storage');
+    const url = await getFileUrl(attachment.filePath);
+    return res.redirect(url);
   } catch (error) {
     console.error('Fetch attachment file error:', error);
     return res.status(500).json({ error: 'Server error fetching attachment file.' });
@@ -1037,12 +1082,13 @@ const parseAttachment = async (req, res) => {
         return res.status(404).json({ error: 'Attachment not found.' });
       }
 
-      const fullPath = path.resolve(attachment.filePath);
-      if (!fs.existsSync(fullPath)) {
-        return res.status(404).json({ error: 'File not found on server disk.' });
+      const { getFileBuffer } = require('../services/storage');
+      try {
+        buffer = await getFileBuffer(attachment.filePath);
+      } catch (err) {
+        return res.status(404).json({ error: 'File not found in storage.' });
       }
-
-      buffer = fs.readFileSync(fullPath);
+      
       filename = attachment.filename;
       fileType = attachment.fileType;
     }

@@ -1,4 +1,4 @@
-const prisma = require('../services/db');
+const { prisma } = require('../services/db');
 const crypto = require('crypto');
 
 /**

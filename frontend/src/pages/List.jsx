@@ -14,14 +14,25 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { fetchTasks, updateTask, deleteTask } from '../store/tasksSlice';
 import { useAuth } from '../context/AuthContext';
 
 const List = ({ socket, searchVal }) => {
+  const parentRef = React.useRef(null);
   const { user } = useAuth();
   const dispatch = useDispatch();
   const { tasks, isLoading, pagination } = useSelector(state => state.tasks);
   const [users, setUsers] = useState([]);
+  
+  const currentTasks = tasks;
+  
+  const rowVirtualizer = useVirtualizer({
+    count: currentTasks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 64, // approximate row height in px
+    overscan: 5,
+  });
 
   // Sorting state
   const [sortBy, setSortBy] = useState('createdAt');
@@ -85,7 +96,6 @@ const List = ({ socket, searchVal }) => {
   };
 
   // Server-driven tasks and pagination metadata
-  const currentTasks = tasks;
   const totalItems = pagination?.total || tasks.length;
   const totalPages = pagination?.totalPages || 1;
   const indexOfFirstItem = (currentPage - 1) * itemsPerPage;
@@ -190,8 +200,8 @@ const List = ({ socket, searchVal }) => {
 
       {/* Main Table Grid Card */}
       <Card className="p-0 border-white/5 overflow-hidden">
-        <div className="overflow-x-auto w-full">
-          <table className="min-w-full text-left border-collapse">
+        <div className="overflow-x-auto w-full max-h-[60vh] overflow-y-auto" ref={parentRef}>
+          <table className="min-w-full text-left border-collapse relative">
             {/* Headers */}
             <thead className="bg-slate-900/80 light:bg-slate-100 border-b border-white/5 light:border-slate-200/50 text-slate-400 light:text-slate-600 text-xs font-bold uppercase tracking-wider">
               <tr>
@@ -236,30 +246,40 @@ const List = ({ socket, searchVal }) => {
             </thead>
 
             {/* Body */}
-            <tbody className="divide-y divide-white/5 light:divide-slate-200/50 text-sm">
-              {currentTasks.map((task) => (
-                <tr key={task.id} className="table-row-hover text-slate-300 light:text-slate-700">
-                  <td className="p-4 font-semibold text-slate-100 light:text-slate-800 max-w-xs truncate">
+            <tbody className="divide-y divide-white/5 light:divide-slate-200/50 text-sm" style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const task = currentTasks[virtualRow.index];
+                return (
+                <tr key={task.id} 
+                    className="table-row-hover text-slate-300 light:text-slate-700 absolute w-full"
+                    style={{
+                      top: 0,
+                      left: 0,
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                >
+                  <td className="p-4 font-semibold text-slate-100 light:text-slate-800 max-w-xs truncate w-[20%]">
                     {task.subject}
                   </td>
-                  <td className="p-4 font-medium">
+                  <td className="p-4 font-medium w-[15%]">
                     {task.customerName}
                   </td>
-                  <td className="p-4 text-slate-400 font-sans">
+                  <td className="p-4 text-slate-400 font-sans w-[20%]">
                     {task.senderEmail}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 w-[10%]">
                     <Badge value={task.priority} variant="priority" />
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 w-[15%]">
                     <span className="font-semibold text-slate-200 light:text-slate-700 text-xs">
                       {task.assignedUser ? task.assignedUser.name : 'Unassigned'}
                     </span>
                   </td>
-                  <td className="p-4 text-slate-400 text-xs font-sans">
+                  <td className="p-4 text-slate-400 text-xs font-sans w-[10%]">
                     {new Date(task.createdAt).toLocaleString()}
                   </td>
-                  <td className="p-4">
+                  <td className="p-4 w-[10%]">
                     <div className="flex items-center justify-center gap-2">
                       <Link to={`/inquiry/${task.id}`}>
                         <button className="p-1.5 rounded-lg border border-white/5 hover:bg-slate-800/50 hover:text-sky-400 transition-colors" title="View details">
@@ -269,11 +289,12 @@ const List = ({ socket, searchVal }) => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
 
               {currentTasks.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="p-10 text-center text-slate-500 text-sm">
+                  <td colSpan="7" className="p-10 text-center text-slate-500 text-sm">
                     No matching inquiries found in database.
                   </td>
                 </tr>

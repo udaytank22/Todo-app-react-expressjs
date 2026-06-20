@@ -1,11 +1,12 @@
 const jwt = require('jsonwebtoken');
-const prisma = require('../services/db');
+const { prisma } = require('../services/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_change_me_in_production';
 
-// In-memory user cache: { [userId]: { user, expiresAt } }
-const userCache = new Map();
+// In-memory fallback if Redis is unavailable
+const fallbackCache = new Map();
 const USER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const USER_CACHE_TTL_SEC = 5 * 60; // 5 minutes
 
 /**
  * Middleware to authenticate requests using JWT tokens
@@ -25,25 +26,45 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    const { getPubClient, getIsRedisAvailable } = require('../services/redis');
+    const redisClient = getPubClient();
 
-    // Check cache first
-    const cached = userCache.get(decoded.id);
     let user;
-    if (cached && cached.expiresAt > Date.now()) {
-      user = cached.user;
+
+    if (redisClient && getIsRedisAvailable()) {
+      // Use Redis
+      const cached = await redisClient.get(`user:${decoded.id}`);
+      if (cached) {
+        user = JSON.parse(cached);
+      } else {
+        user = await prisma.user.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, email: true, name: true, role: true }
+        });
+        if (user) {
+          await redisClient.setEx(`user:${decoded.id}`, USER_CACHE_TTL_SEC, JSON.stringify(user));
+        }
+      }
     } else {
-      // Verify user still exists in the database
-      user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        select: { id: true, email: true, name: true, role: true }
-      });
-      if (user) {
-        userCache.set(decoded.id, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+      // Fallback to in-memory
+      const cached = fallbackCache.get(decoded.id);
+      if (cached && cached.expiresAt > Date.now()) {
+        user = cached.user;
+      } else {
+        user = await prisma.user.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, email: true, name: true, role: true }
+        });
+        if (user) {
+          fallbackCache.set(decoded.id, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+        }
       }
     }
 
     if (!user) {
-      userCache.delete(decoded.id);
+      if (redisClient && getIsRedisAvailable()) await redisClient.del(`user:${decoded.id}`);
+      else fallbackCache.delete(decoded.id);
+      
       return res.status(403).json({ error: 'User account not found or has been disabled.' });
     }
 

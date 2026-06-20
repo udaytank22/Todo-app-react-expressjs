@@ -1,0 +1,32 @@
+# backend/scripts/loadtest.yml
+# Artillery load testing configuration
+# Run with: npx artillery run backend/scripts/loadtest.yml
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 50
+      name: "Warm up phase"
+    - duration: 120
+      arrivalRate: 50
+      name: "Sustained peak load"
+  environments:
+    production:
+      target: "https://your-production-url.com"
+
+scenarios:
+  - name: "Typical User Flow (View Tasks)"
+    flow:
+      - get:
+          url: "/health"
+      - get:
+          url: "/api/tasks"
+          qs:
+            page: 1
+            limit: 20
+          # We expect this to fail with 401 if no auth token is provided
+          # But for testing throughput on the API layer, it still exercises the Express stack
+      - get:
+          url: "/api/emails/status"

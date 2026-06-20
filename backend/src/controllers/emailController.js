@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const prisma = require('../services/db');
+const { prisma } = require('../services/db');
 const { getAuthUrl, exchangeAuthCode, isConnected, fetchEmails } = require('../services/outlook');
 const { analyzeInquiryWithGemini } = require('../services/gemini');
 const { emitNewInquiry } = require('../services/socket');
@@ -61,9 +61,9 @@ const oauthCallback = async (req, res) => {
 /**
  * Check connection status of Outlook Integration
  */
-const getStatus = (req, res) => {
+const getStatus = async (req, res) => {
   return res.json({
-    connected: isConnected(),
+    connected: await isConnected(),
     demoMode: process.env.DEMO_MODE === 'true',
   });
 };
