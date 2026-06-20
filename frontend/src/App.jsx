@@ -22,8 +22,7 @@ import { useDispatch } from 'react-redux';
 import { fetchTasks, addInquiryLocal, updateStatusLocal, updateTaskLocal, removeTaskLocal, addCommentLocal } from './store/tasksSlice';
 import { fetchNotifications, addNotificationLocal } from './store/notificationsSlice';
 
-// Main layout wrapper for protected routes
-const MainLayout = ({ onSyncSuccess, searchVal, onSearchChange, isMailConnected, isDemoMode }) => {
+const MainLayout = ({ socket, onSyncSuccess, searchVal, onSearchChange, isMailConnected, isDemoMode }) => {
  return (
  <div className="flex h-screen w-screen overflow-hidden text-slate-900 transition-colors duration-300 bg-cover bg-center bg-no-repeat bg-fixed" style={{ backgroundImage: "url('/bg-light.png')" }}>
  {/* Sidebar Navigation */}
@@ -33,6 +32,7 @@ const MainLayout = ({ onSyncSuccess, searchVal, onSearchChange, isMailConnected,
  <div className="flex-1 flex flex-col h-full overflow-hidden">
  {/* Top Navbar */}
  <Navbar
+ socket={socket}
  isMailConnected={isMailConnected}
  isDemoMode={isDemoMode}
  onSyncSuccess={onSyncSuccess}

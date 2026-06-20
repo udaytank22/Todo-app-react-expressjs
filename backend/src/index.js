@@ -20,6 +20,7 @@ const emailRoutes = require('./routes/emailRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const customerAssignmentRoutes = require('./routes/customerAssignmentRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 const { prometheus, metricsMiddleware, checkHealth } = require('./utils/monitoring');
 const logger = require('./utils/logger');
 
@@ -132,6 +133,7 @@ const startServer = async () => {
   app.use('/api/tasks', taskRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/customer-assignments', customerAssignmentRoutes);
+  app.use('/api/chat', chatRoutes);
 
   // --- Observability Endpoints ---
   app.get('/health', async (req, res) => {

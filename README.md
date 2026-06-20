@@ -51,7 +51,7 @@ c:\Users\HP\Desktop\To-Do app\
 3. **Configure Environment Variables**:
    Create a `.env` file in the `backend` root matching the template below:
    ```env
-   PORT=5000
+   PORT=5001
    DATABASE_URL="postgresql://postgres:password@localhost:5432/inquiry_db?schema=public"
    JWT_SECRET="generate_a_secure_secret_key"
    GEMINI_API_KEY="your_google_gemini_api_key"
@@ -64,7 +64,7 @@ c:\Users\HP\Desktop\To-Do app\
    MICROSOFT_CLIENT_ID=""
    MICROSOFT_CLIENT_SECRET=""
    MICROSOFT_TENANT_ID="common"
-   MICROSOFT_REDIRECT_URI="http://localhost:5000/api/emails/callback"
+   MICROSOFT_REDIRECT_URI="http://localhost:5001/api/emails/callback"
    ```
 
 4. **Initialize Database Schema & Client**:
@@ -94,7 +94,7 @@ c:\Users\HP\Desktop\To-Do app\
    # Development hot-reload mode
    npm run dev
    ```
-   The backend server runs on `http://localhost:5000`.
+   The backend server runs on `http://localhost:5001`.
 
 ---
 

@@ -77,6 +77,9 @@ const authenticateToken = async (req, res, next) => {
     next();
   } catch (err) {
     console.error('JWT Verification error:', err.message);
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'token_expired', message: 'Access token has expired.' });
+    }
     return res.status(403).json({ error: 'Invalid or expired session token. Please log in again.' });
   }
 };

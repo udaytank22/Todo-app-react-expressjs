@@ -5,6 +5,7 @@ import { Loader, Calendar, StickyNote, Inbox, ExternalLink, CalendarDays } from 
 import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import DatePicker from '../components/ui/DatePicker';
+import Badge from '../components/ui/Badge';
 
 const UnassignedNotes = () => {
     const { token } = useAuth();
@@ -46,7 +47,7 @@ const UnassignedNotes = () => {
     }, [token, selectedDate]);
 
     return (
-        <div className="h-full p-3 lg:p-8 flex flex-col space-y-3">
+        <div className="p-3 space-y-3 flex flex-col font-sans">
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -59,7 +60,7 @@ const UnassignedNotes = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <DatePicker 
+                    <DatePicker
                         value={selectedDate}
                         onChange={(val) => setSelectedDate(val)}
                     />
@@ -84,10 +85,11 @@ const UnassignedNotes = () => {
                         <p className="text-sm mt-1">There are no unassigned inquiries for {new Date(selectedDate).toLocaleDateString()}.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                         {tasks.map(task => (
                             <Card key={task.id} className="p-5 flex flex-col h-full border-l-4 border-l-sky-400 hover:shadow-lg transition-shadow">
-                                <div className="flex justify-end items-start mb-1">
+                                <div className="flex justify-between items-start mb-2">
+                                    <Badge value={task.priority} variant="priority" />
                                     <Link to={`/inquiry/${task.id}`} className="p-1 hover:bg-slate-100 rounded-md transition-colors text-slate-400 hover:text-sky-500">
                                         <ExternalLink className="h-4 w-4" />
                                     </Link>
@@ -119,9 +121,7 @@ const UnassignedNotes = () => {
 
                                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
                                     <span>{new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    <span className="font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                                        {task.status}
-                                    </span>
+                                    <Badge value={task.status} variant="status" />
                                 </div>
                             </Card>
                         ))}

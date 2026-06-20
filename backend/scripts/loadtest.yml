@@ -3,7 +3,7 @@
 # Run with: npx artillery run backend/scripts/loadtest.yml
 
 config:
-  target: "http://localhost:5000"
+  target: "http://localhost:5001"
   phases:
     - duration: 60
       arrivalRate: 5

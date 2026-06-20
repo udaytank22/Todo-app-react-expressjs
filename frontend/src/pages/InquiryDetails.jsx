@@ -520,12 +520,7 @@ const InquiryDetails = () => {
                                 </div>
                             )}
 
-                            <div className="space-y-1">
-                                <span className="text-[10px] text-slate-500 font-bold uppercase">Target Due Date</span>
-                                <p className="text-xs text-slate-700 font-sans">
-                                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date specified'}
-                                </p>
-                            </div>
+
 
                             {/* Products/Items Grid */}
                             {aiSummaryObj.products && aiSummaryObj.products.length > 0 && (
@@ -548,13 +543,7 @@ const InquiryDetails = () => {
                                 </div>
                             )}
 
-                            {/* Remarks remarks tab */}
-                            <div className="space-y-1 pt-2 border-t border-black/5">
-                                <span className="text-[10px] text-slate-500 font-bold uppercase">Additional AI Remarks</span>
-                                <p className="text-xs text-slate-700 font-sans leading-relaxed">
-                                    {aiSummaryObj.remarks || 'No observations recorded.'}
-                                </p>
-                            </div>
+
 
                             {/* External platform ticket links */}
                             {task.externalLink && (

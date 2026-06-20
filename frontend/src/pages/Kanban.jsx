@@ -184,8 +184,8 @@ const Kanban = ({ socket, searchVal }) => {
                                             setIsPriorityOpen(false);
                                         }}
                                         className={`w-full text-left px-4 py-2.5 text-xs transition-colors ${priorityFilter === opt.value
-                                                ? 'bg-sky-50 text-sky-600 font-bold'
-                                                : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-semibold'
+                                            ? 'bg-sky-50 text-sky-600 font-bold'
+                                            : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-semibold'
                                             }`}
                                     >
                                         {opt.label}
@@ -254,14 +254,11 @@ const Kanban = ({ socket, searchVal }) => {
                                                             >
                                                                 <Card
                                                                     hoverEffect
-                                                                    className={`p-2 border border-black/5 relative ${draggedSnapshot.isDragging ? 'shadow-2xl border-sky-500/50 scale-[1.02] bg-white/90' : ''
+                                                                    className={`p-4 border border-black/5 border-l-4 border-l-sky-400 relative ${draggedSnapshot.isDragging ? 'shadow-2xl border-sky-500/50 scale-[1.02] bg-white/90' : ''
                                                                         }`}
                                                                 >
-                                                                    {/* Card Header ID & Priority */}
-                                                                    <div className="flex items-center justify-between gap-2">
-                                                                        <span className="text-[10px] font-extrabold text-sky-400 tracking-wider font-sans">
-                                                                            {task.inquiryId}
-                                                                        </span>
+                                                                    {/* Card Header Priority */}
+                                                                    <div className="flex items-center justify-start">
                                                                         <Badge value={task.priority} variant="priority" />
                                                                     </div>
 
@@ -276,7 +273,7 @@ const Kanban = ({ socket, searchVal }) => {
                                                                     </p>
 
                                                                     {/* Card Footer Details */}
-                                                                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-black/5 text-slate-500 text-[10px]">
+                                                                    <div className="flex items-center justify-between mt-4 text-slate-500 text-[10px]">
                                                                         <div className="flex items-center gap-2">
                                                                             {/* Indicator: Attachments */}
                                                                             {task._count?.attachments > 0 && (
@@ -298,10 +295,10 @@ const Kanban = ({ socket, searchVal }) => {
                                                                         {/* Action link */}
                                                                         <Link
                                                                             to={`/inquiry/${task.id}`}
-                                                                            className="text-sky-400 hover:text-sky-300 flex items-center gap-0.5 group focus:outline-none"
+                                                                            className="text-blue-600 hover:text-blue-500 flex items-center gap-0.5 group focus:outline-none text-xs font-semibold"
                                                                         >
                                                                             <span>Details</span>
-                                                                            <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                                                                            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                                                                         </Link>
                                                                     </div>
                                                                 </Card>

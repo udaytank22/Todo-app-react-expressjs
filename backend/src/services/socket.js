@@ -82,6 +82,32 @@ const initSocket = (server, pubClient = null, subClient = null) => {
       console.log(`[Socket.IO] Ignored client-supplied join for ${socket.id}. Auto-joined from token instead.`);
     });
 
+    socket.on('send_direct_message', async (data) => {
+      const { receiverId, content } = data;
+      if (!receiverId || !content || !content.trim()) return;
+
+      try {
+        const { prisma } = require('./db');
+        const message = await prisma.directMessage.create({
+          data: {
+            senderId: socket.userId,
+            receiverId,
+            content: content.trim(),
+          },
+          include: {
+            sender: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        });
+
+        // Emit to both sender and receiver rooms
+        io.to(`user_${socket.userId}`).to(`user_${receiverId}`).emit('receive_direct_message', message);
+      } catch (error) {
+        console.error('[Socket.IO] Failed to process send_direct_message:', error);
+      }
+    });
+
     socket.on('disconnect', (reason) => {
       console.log(`[Socket.IO] Client disconnected: ${socket.id} — reason: ${reason}`);
     });

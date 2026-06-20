@@ -128,7 +128,6 @@ const getAllTasks = async (req, res) => {
     // --- Fetch live Outlook emails if conditions are met ---
     let liveEmails = [];
     if (
-      req.user.role !== 'STAFF' &&
       isConnected() &&
       !status && !priority && !search && !customer
     ) {
@@ -226,6 +225,10 @@ const getAllTasks = async (req, res) => {
         const t = new Date(e.createdAt).getTime();
         return t >= startOfDay && t <= endOfDay;
       });
+    }
+
+    if (req.user.role === 'STAFF') {
+      liveEmails = liveEmails.filter(e => e.assignedUserId === req.user.id);
     }
 
     // --- Query Database & Merge with Live Emails ---
@@ -338,7 +341,7 @@ const getTaskById = async (req, res) => {
     }
 
     // 2. If not found in database, check if it's a live Outlook message (Only for Admin/Manager roles)
-    if (req.user.role !== 'STAFF' && isConnected()) {
+    if (isConnected()) {
       const emails = await fetchEmails();
 
       // Decode hex ID back to raw messageId
@@ -354,6 +357,11 @@ const getTaskById = async (req, res) => {
       const matchedEmail = emails.find(e => e.messageId === decodedId);
       if (matchedEmail) {
         const matchedUserId = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
+        
+        if (req.user.role === 'STAFF' && matchedUserId !== req.user.id) {
+          return res.status(403).json({ error: 'Access Denied: You are not authorized to view this inquiry.' });
+        }
+
         let assignedUserObj = null;
         if (matchedUserId) {
           assignedUserObj = await prismaRead.user.findUnique({
