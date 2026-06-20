@@ -64,7 +64,7 @@ const createAndEmitNotificationsBatch = async (userIds, type, title, message, re
  */
 const getAllTasks = async (req, res) => {
   const {
-    status, priority, search, customer,
+    status, priority, search, customer, unassigned, date,
     sortBy = 'createdAt', sortOrder = 'desc',
     page = '1', limit = '50',
   } = req.query;
@@ -100,6 +100,19 @@ const getAllTasks = async (req, res) => {
         { senderEmail: { search: tsquery } },
         { inquiryId: { search: tsquery } },
       ];
+    }
+    if (unassigned === 'true') {
+      where.assignedUserId = null;
+    }
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      where.createdAt = {
+        gte: startOfDay,
+        lte: endOfDay,
+      };
     }
 
     // --- Pagination ---
@@ -140,11 +153,37 @@ const getAllTasks = async (req, res) => {
           return !existingTaskIds.has(hexId);
         });
 
+        // Fetch assignment rules for dynamic live email assignments
+        const assignmentRules = await prismaRead.customerAssignment.findMany({
+          include: {
+            assignedUser: {
+              select: { id: true, name: true, email: true, role: true },
+            },
+          },
+        });
+
         liveEmails = unpersistedEmails.map((email, index) => {
           const inqRegex = /INQ-\d+/i;
           const subjectMatch = email.subject ? email.subject.match(inqRegex) : null;
           const bodyMatch = email.body ? email.body.match(inqRegex) : null;
           const inquiryId = subjectMatch ? subjectMatch[0].toUpperCase() : (bodyMatch ? bodyMatch[0].toUpperCase() : `INQ-LIVE-${index + 1}`);
+
+          let matchedRule = null;
+          const normalizedEmail = email.senderEmail ? email.senderEmail.trim().toLowerCase() : '';
+          const normalizedName = email.senderName ? email.senderName.trim().toLowerCase() : '';
+
+          for (const r of assignmentRules) {
+            if (r.customerEmail && r.customerEmail.toLowerCase() === normalizedEmail) {
+              matchedRule = r; break;
+            }
+          }
+          if (!matchedRule) {
+            for (const r of assignmentRules) {
+              if (r.customerName && normalizedName.includes(r.customerName.toLowerCase())) {
+                matchedRule = r; break;
+              }
+            }
+          }
 
           return {
             id: Buffer.from(email.messageId).toString('hex'),
@@ -160,8 +199,8 @@ const getAllTasks = async (req, res) => {
             remarks: null,
             createdAt: email.receivedAt,
             updatedAt: email.receivedAt,
-            assignedUserId: null,
-            assignedUser: null,
+            assignedUserId: matchedRule ? matchedRule.assignedUserId : null,
+            assignedUser: matchedRule ? matchedRule.assignedUser : null,
             _count: {
               attachments: email.attachments ? email.attachments.length : 0,
               comments: 0
@@ -177,57 +216,67 @@ const getAllTasks = async (req, res) => {
       }
     }
 
-    // --- Pagination math for combined list ---
-    const L = liveEmails.length;
-    const startIdx = (pageNum - 1) * limitNum;
-    const endIdx = pageNum * limitNum;
-
-    let pageLiveEmails = [];
-    let dbSkip = 0;
-    let dbTake = limitNum;
-
-    if (startIdx < L) {
-      pageLiveEmails = liveEmails.slice(startIdx, Math.min(endIdx, L));
-      const takenL = pageLiveEmails.length;
-      dbSkip = 0;
-      dbTake = limitNum - takenL;
-    } else {
-      pageLiveEmails = [];
-      dbSkip = startIdx - L;
-      dbTake = limitNum;
+    if (unassigned === 'true') {
+      liveEmails = liveEmails.filter(e => e.assignedUserId === null);
+    }
+    if (date) {
+      const startOfDay = new Date(date).setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(date).setUTCHours(23, 59, 59, 999);
+      liveEmails = liveEmails.filter(e => {
+        const t = new Date(e.createdAt).getTime();
+        return t >= startOfDay && t <= endOfDay;
+      });
     }
 
-    // --- Query Database ---
-    let dbTasks = [];
-    let total = 0;
+    // --- Query Database & Merge with Live Emails ---
+    // To guarantee global sorting (where a DB task might be newer than a live email),
+    // we fetch up to `skip + limitNum` from the database, merge, sort, and slice.
+    const takeFromDb = skip + limitNum;
 
-    if (dbTake > 0) {
-      const [dbTotal, queryTasks] = await Promise.all([
-        prismaRead.task.count({ where }),
-        prismaRead.task.findMany({
-          where,
-          include: {
-            assignedUser: {
-              select: { id: true, name: true, email: true, role: true },
-            },
-            _count: {
-              select: { attachments: true, comments: true },
-            },
+    const [dbTotal, queryTasks] = await Promise.all([
+      prismaRead.task.count({ where }),
+      prismaRead.task.findMany({
+        where,
+        include: {
+          assignedUser: {
+            select: { id: true, name: true, email: true, role: true },
           },
-          orderBy: { [safeSortBy]: safeSortOrder },
-          skip: dbSkip,
-          take: dbTake,
-        }),
-      ]);
-      total = dbTotal;
-      dbTasks = queryTasks;
-    } else {
-      total = await prismaRead.task.count({ where });
-    }
+          _count: {
+            select: { attachments: true, comments: true },
+          },
+        },
+        orderBy: { [safeSortBy]: safeSortOrder },
+        take: takeFromDb,
+      }),
+    ]);
 
-    const totalCombined = total + L;
+    // Merge liveEmails and queryTasks
+    let combinedAll = [...liveEmails, ...queryTasks];
+
+    // Sort the combined array in memory
+    combinedAll.sort((a, b) => {
+      let valA = a[safeSortBy];
+      let valB = b[safeSortBy];
+
+      if (['createdAt', 'updatedAt', 'dueDate'].includes(safeSortBy)) {
+        valA = valA ? new Date(valA).getTime() : 0;
+        valB = valB ? new Date(valB).getTime() : 0;
+      } else if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB || '').toLowerCase();
+      }
+
+      if (valA < valB) return safeSortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return safeSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Apply pagination slice
+    const paginatedData = combinedAll.slice(skip, skip + limitNum);
+
+    const totalCombined = dbTotal + liveEmails.length;
     const responseData = {
-      data: [...pageLiveEmails, ...dbTasks],
+      data: paginatedData,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -304,6 +353,15 @@ const getTaskById = async (req, res) => {
 
       const matchedEmail = emails.find(e => e.messageId === decodedId);
       if (matchedEmail) {
+        const matchedUserId = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
+        let assignedUserObj = null;
+        if (matchedUserId) {
+          assignedUserObj = await prismaRead.user.findUnique({
+            where: { id: matchedUserId },
+            select: { id: true, name: true, email: true, role: true },
+          });
+        }
+
         return res.json({
           id: Buffer.from(matchedEmail.messageId).toString('hex'),
           inquiryId: `INQ-LIVE`,
@@ -319,7 +377,8 @@ const getTaskById = async (req, res) => {
           aiSummary: null,
           createdAt: matchedEmail.receivedAt,
           updatedAt: matchedEmail.receivedAt,
-          assignedUser: null,
+          assignedUserId: matchedUserId || null,
+          assignedUser: assignedUserObj || null,
           attachments: matchedEmail.attachments ? matchedEmail.attachments.map((att) => ({
             id: Buffer.from(JSON.stringify({ m: matchedEmail.messageId, a: att.id })).toString('hex'),
             filename: att.filename,

@@ -11,54 +11,30 @@
 @layer components {
   /* Glassmorphism Styles */
   .glass-panel {
-    background: rgba(15, 23, 42, 0.65);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-  }
-
-  .light .glass-panel {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
   }
 
   /* Glass Inputs */
   .glass-input {
-    background: rgba(30, 41, 59, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    @apply rounded-xl px-4 py-2.5 outline-none transition-all duration-200 text-slate-100 placeholder-slate-500 focus:border-sky-500/50 focus:ring-2 focus:ring-sky-500/20;
-  }
-
-  .light .glass-input {
     background: rgba(241, 245, 249, 0.8);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    @apply text-slate-800 placeholder-slate-400 focus:border-sky-600/50 focus:ring-2 focus:ring-sky-600/10;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    @apply rounded-xl px-4 py-2.5 outline-none transition-all duration-200 text-slate-800 placeholder-slate-400 focus:border-sky-600/50 focus:ring-2 focus:ring-sky-600/10;
   }
 
   /* Sidebar Active/Hover Highlights */
   .sidebar-link {
     border: 1px solid transparent;
-    @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-100 hover:bg-slate-800/40;
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100/80;
   }
 
   .sidebar-link.active {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(14, 165, 233, 0.05) 100%);
-    border-color: rgba(14, 165, 233, 0.25);
-    @apply text-sky-400 font-medium shadow-lg shadow-sky-500/5;
-  }
-
-  .light .sidebar-link {
-    @apply text-slate-600 hover:text-slate-900 hover:bg-slate-100/60;
-  }
-
-  .light .sidebar-link.active {
     background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(14, 165, 233, 0.02) 100%);
     border-color: rgba(14, 165, 233, 0.18);
-    @apply text-sky-600 shadow-md shadow-sky-500/5;
+    @apply text-sky-600 font-medium shadow-md shadow-sky-500/5;
   }
 
   /* Custom Scrollbars */
@@ -72,30 +48,17 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.1);
     border-radius: 999px;
   }
 
-  .light ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-  }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.18);
-  }
-
-  .light ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.18);
   }
 
   /* Kanban board custom styling */
   .kanban-column {
     @apply flex flex-col w-80 min-w-80 shrink-0 rounded-2xl p-4 transition-all duration-200;
-    background: rgba(15, 23, 42, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  .light .kanban-column {
     background: rgba(248, 250, 252, 0.75);
     border: 1px solid rgba(0, 0, 0, 0.03);
   }
@@ -112,11 +75,7 @@
 
   /* Table Hover Effects */
   .table-row-hover {
-    @apply transition-all duration-200 hover:bg-slate-800/30;
-  }
-
-  .light .table-row-hover {
-    @apply hover:bg-slate-50/80;
+    @apply transition-all duration-200 hover:bg-slate-50/80;
   }
 
   /* Loading Shimmer Skeletons */
@@ -126,12 +85,6 @@
   }
 
   .skeleton-loader {
-    background: linear-gradient(90deg, rgba(30, 41, 59, 0.4) 25%, rgba(51, 65, 85, 0.6) 50%, rgba(30, 41, 59, 0.4) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite linear;
-  }
-
-  .light .skeleton-loader {
     background: linear-gradient(90deg, rgba(226, 232, 240, 0.7) 25%, rgba(241, 245, 249, 0.9) 50%, rgba(226, 232, 240, 0.7) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite linear;

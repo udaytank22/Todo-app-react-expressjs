@@ -26,6 +26,7 @@ const logger = require('./utils/logger');
 // Utils / External services
 const { isConnected, fetchEmails } = require('./services/outlook');
 const { findAssignedUser } = require('./utils/assignmentEngine');
+const { startEmailSyncWorker, stopEmailSyncWorker } = require('./workers/emailSyncWorker');
 
 // ── App & Server ──────────────────────────────────────────────────────────────
 const app = express();
@@ -172,7 +173,8 @@ const startServer = async () => {
     console.log(`  Redis       : ${getIsRedisAvailable() ? '✓ Connected' : '✗ Unavailable (in-memory fallback)'}`);
     console.log('==================================================');
 
-    // Background email sync has been moved to Bull worker
+    // Start background email sync polling
+    startEmailSyncWorker();
   });
 
   // ── 12. Graceful Shutdown ────────────────────────────────────────────────
@@ -182,6 +184,9 @@ const startServer = async () => {
     // Stop accepting new HTTP connections
     server.close(async () => {
       console.log('[Server] HTTP server closed — no new connections accepted.');
+
+      // Stop polling emails
+      stopEmailSyncWorker();
 
       try {
         await prisma.$disconnect();

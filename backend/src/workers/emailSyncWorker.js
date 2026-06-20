@@ -1,38 +1,19 @@
-const Queue = require('bull');
 const fs = require('fs');
 const path = require('path');
 const { prisma } = require('../services/db');
 const { fetchEmails, isConnected, fetchLiveAttachment } = require('../services/outlook');
 const { emitNewInquiry, emitNewNotification } = require('../services/socket');
-const { findAssignedUser } = require('../services/customerAssignment');
+const { findAssignedUser } = require('../utils/assignmentEngine');
 const { generateInquiryId } = require('../utils/idGenerator');
 const logger = require('../utils/logger');
 
-// Initialize Bull Queue
-// Bull uses Redis to distribute background jobs across worker processes
-const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const emailQueue = new Queue('email-sync', redisUrl, {
-  redis: {
-    maxRetriesPerRequest: null,
-    retryStrategy(times) {
-      if (times > 3) return null; // Stop reconnecting after 3 attempts
-      return 500;
-    }
-  }
-});
-
-let isEmailQueueErrorLogged = false;
-emailQueue.on('error', (err) => {
-  if (!isEmailQueueErrorLogged && err.code === 'ECONNREFUSED') {
-    console.warn('⚠️ Redis not found for Email Sync Worker. Background jobs disabled.');
-    isEmailQueueErrorLogged = true;
-  }
-});
-
 const prevEmailsMap = new Map();
+let syncInterval = null;
+let isSyncing = false;
 
-// Process jobs
-emailQueue.process(async (job) => {
+const processEmails = async () => {
+  if (isSyncing) return;
+  isSyncing = true;
   try {
     const connected = await isConnected();
     if (!connected) {
@@ -227,23 +208,33 @@ emailQueue.process(async (job) => {
             }
           }
         } catch (notifErr) {
-          logToFile(`[Bull Worker] Failed to create notification: ${notifErr.message}`);
-          logger.error(`[Bull Worker] Failed to create notification: ${notifErr.message}`);
+          logger.error(`[Email Worker] Failed to create notification: ${notifErr.message}`);
         }
 
         prevEmailsMap.set(email.messageId, true);
       }
     }
   } catch (error) {
-    logger.error(`[Bull Worker] Sync failed: ${error.message}`);
+    logger.error(`[Email Worker] Sync failed: ${error.message}`);
+  } finally {
+    isSyncing = false;
   }
-});
+};
 
-// Remove old repeatable jobs to avoid duplicates when testing
-emailQueue.empty().then(() => {
-  // Add repeatable job to run every 15 seconds
-  emailQueue.add({}, { repeat: { every: 15000 } });
-  console.log('[Bull Worker] Email sync worker started, polling every 15s');
-});
+const startEmailSyncWorker = () => {
+  if (syncInterval) return;
+  logger.info('[Email Worker] Started polling every 15s');
+  syncInterval = setInterval(processEmails, 15000);
+  // Run once immediately
+  processEmails();
+};
 
-module.exports = emailQueue;
+const stopEmailSyncWorker = () => {
+  if (syncInterval) {
+    clearInterval(syncInterval);
+    syncInterval = null;
+    logger.info('[Email Worker] Stopped.');
+  }
+};
+
+module.exports = { startEmailSyncWorker, stopEmailSyncWorker };

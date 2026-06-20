@@ -80,6 +80,25 @@ const createRule = async (req, res) => {
       },
     });
 
+    // Apply this assign change to old unassigned tasks from this sender
+    const updateWhere = {
+      assignedUserId: null,
+      OR: [],
+    };
+    if (emailPattern) updateWhere.OR.push({ senderEmail: { equals: emailPattern, mode: 'insensitive' } });
+    if (namePattern) updateWhere.OR.push({ customerName: { contains: namePattern, mode: 'insensitive' } });
+
+    if (updateWhere.OR.length > 0) {
+      try {
+        await prisma.task.updateMany({
+          where: updateWhere,
+          data: { assignedUserId },
+        });
+      } catch (err) {
+        console.error('Failed to update old tasks with new rule:', err);
+      }
+    }
+
     await cache.invalidate('assignment_rules');
     return res.status(201).json(rule);
   } catch (error) {
@@ -115,8 +134,88 @@ const deleteRule = async (req, res) => {
   }
 };
 
+/**
+ * Update an auto-assignment rule
+ */
+const updateRule = async (req, res) => {
+  const { id } = req.params;
+  const { customerName, customerEmail, assignedUserId } = req.body;
+
+  if (!customerName && !customerEmail) {
+    return res.status(400).json({ error: 'Either Customer Name or Customer Email must be specified.' });
+  }
+
+  if (!assignedUserId) {
+    return res.status(400).json({ error: 'An assignee (employee) must be selected.' });
+  }
+
+  try {
+    const userExists = await prisma.user.findUnique({
+      where: { id: assignedUserId },
+    });
+
+    if (!userExists) {
+      return res.status(404).json({ error: 'Assigned employee not found.' });
+    }
+
+    const emailPattern = customerEmail ? customerEmail.trim().toLowerCase() : null;
+    const namePattern = customerName ? customerName.trim() : null;
+
+    const existingRule = await prisma.customerAssignment.findFirst({
+      where: {
+        customerName: namePattern,
+        customerEmail: emailPattern,
+        id: { not: id },
+      },
+    });
+
+    if (existingRule) {
+      return res.status(400).json({ error: 'An assignment rule for this customer name/email combination already exists.' });
+    }
+
+    const rule = await prisma.customerAssignment.update({
+      where: { id },
+      data: {
+        customerName: namePattern,
+        customerEmail: emailPattern,
+        assignedUserId,
+      },
+      include: {
+        assignedUser: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    });
+
+    const updateWhere = {
+      assignedUserId: null,
+      OR: [],
+    };
+    if (emailPattern) updateWhere.OR.push({ senderEmail: { equals: emailPattern, mode: 'insensitive' } });
+    if (namePattern) updateWhere.OR.push({ customerName: { contains: namePattern, mode: 'insensitive' } });
+
+    if (updateWhere.OR.length > 0) {
+      try {
+        await prisma.task.updateMany({
+          where: updateWhere,
+          data: { assignedUserId },
+        });
+      } catch (err) {
+        console.error('Failed to update old tasks with new rule:', err);
+      }
+    }
+
+    await cache.invalidate('assignment_rules');
+    return res.json(rule);
+  } catch (error) {
+    console.error('Error updating assignment rule:', error);
+    return res.status(500).json({ error: 'Server error updating auto-assignment rule.' });
+  }
+};
+
 module.exports = {
   getAllRules,
   createRule,
   deleteRule,
+  updateRule,
 };
