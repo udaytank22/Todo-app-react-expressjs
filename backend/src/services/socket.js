@@ -1,5 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const { encrypt, decrypt } = require('../utils/encryption');
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -60,6 +62,7 @@ const initSocket = (server, pubClient = null, subClient = null) => {
       socket.userId = decoded.id;
       socket.userRole = decoded.role;
       socket.userName = decoded.name;
+      socket.isMobile = socket.handshake.auth?.device === 'mobile' || socket.handshake.query?.device === 'mobile';
       next();
     } catch (err) {
       next(new Error('Invalid or expired token. Please log in again.'));
@@ -68,13 +71,18 @@ const initSocket = (server, pubClient = null, subClient = null) => {
 
   // ── Connection Handler ────────────────────────────────────────────────────
   io.on('connection', (socket) => {
-    console.log(`[Socket.IO] Client connected: ${socket.id} (userId: ${socket.userId}, role: ${socket.userRole})`);
+    console.log(`[Socket.IO] Client connected: ${socket.id} (userId: ${socket.userId}, role: ${socket.userRole}, isMobile: ${!!socket.isMobile})`);
 
     // Auto-join the authenticated user's private room so targeted notifications
     // (new_notification events) are delivered without a separate 'join' call.
-    socket.join(`user_${socket.userId}`);
-    // Also join a role-based room for scoped broadcasts
-    socket.join(`role_${socket.userRole}`);
+    if (socket.isMobile) {
+      socket.join(`user_${socket.userId}_mobile`);
+      socket.join(`role_${socket.userRole}_mobile`);
+      console.log(`[Socket.IO] Socket joined mobile rooms: user_${socket.userId}_mobile, role_${socket.userRole}_mobile`);
+    } else {
+      socket.join(`user_${socket.userId}`);
+      socket.join(`role_${socket.userRole}`);
+    }
 
     // Keep backward compatibility with clients that still emit 'join' explicitly.
     // Explicit joins from clients are ignored in favor of the JWT derived ID.
@@ -83,7 +91,23 @@ const initSocket = (server, pubClient = null, subClient = null) => {
     });
 
     socket.on('send_direct_message', async (data) => {
-      const { receiverId, content } = data;
+      let payload = data;
+      if (socket.isMobile && data && data.encryptedData) {
+        const decrypted = decrypt(data.encryptedData);
+        if (decrypted) {
+          try {
+            payload = JSON.parse(decrypted);
+          } catch (e) {
+            console.error('[Socket.IO] Failed to parse decrypted send_direct_message payload:', e.message);
+            return;
+          }
+        } else {
+          console.error('[Socket.IO] Failed to decrypt send_direct_message payload.');
+          return;
+        }
+      }
+
+      const { receiverId, content } = payload;
       if (!receiverId || !content || !content.trim()) return;
 
       try {
@@ -101,8 +125,12 @@ const initSocket = (server, pubClient = null, subClient = null) => {
           },
         });
 
-        // Emit to both sender and receiver rooms
+        // Emit to web clients (unencrypted)
         io.to(`user_${socket.userId}`).to(`user_${receiverId}`).emit('receive_direct_message', message);
+        
+        // Emit to mobile clients (encrypted)
+        const encryptedMessage = { encryptedData: encrypt(JSON.stringify(message)) };
+        io.to(`user_${socket.userId}_mobile`).to(`user_${receiverId}_mobile`).emit('receive_direct_message', encryptedMessage);
       } catch (error) {
         console.error('[Socket.IO] Failed to process send_direct_message:', error);
       }
@@ -135,6 +163,13 @@ const getIO = () => {
 // All helpers guard against being called before initSocket() via `if (!io) return`.
 
 /**
+ * Helper to encrypt socket payload if it is an object
+ */
+const encryptPayload = (data) => {
+  return { encryptedData: encrypt(JSON.stringify(data)) };
+};
+
+/**
  * Broadcast a new inquiry/task to all connected clients.
  * @param {object} task
  */
@@ -158,12 +193,19 @@ const emitNewInquiry = (task) => {
     _count: task._count || { attachments: 0, comments: 0 },
   };
 
+  // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('new_inquiry', payload);
   if (task.assignedUserId) {
     io.to(`user_${task.assignedUserId}`).emit('new_inquiry', payload);
   }
-};
 
+  // Mobile clients (encrypted)
+  const encPayload = encryptPayload(payload);
+  io.to('role_ADMIN_mobile').to('role_MANAGER_mobile').emit('new_inquiry', encPayload);
+  if (task.assignedUserId) {
+    io.to(`user_${task.assignedUserId}_mobile`).emit('new_inquiry', encPayload);
+  }
+};
 
 /**
  * Broadcast a task status change to scoped clients.
@@ -172,9 +214,18 @@ const emitNewInquiry = (task) => {
 const emitStatusUpdate = (payload) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting task_status_updated for task: ${payload.taskId}`);
+  
+  // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('task_status_updated', payload);
   if (payload.assignedUserId) {
     io.to(`user_${payload.assignedUserId}`).emit('task_status_updated', payload);
+  }
+
+  // Mobile clients (encrypted)
+  const encPayload = encryptPayload(payload);
+  io.to('role_ADMIN_mobile').to('role_MANAGER_mobile').emit('task_status_updated', encPayload);
+  if (payload.assignedUserId) {
+    io.to(`user_${payload.assignedUserId}_mobile`).emit('task_status_updated', encPayload);
   }
 };
 
@@ -185,9 +236,18 @@ const emitStatusUpdate = (payload) => {
 const emitTaskAssigned = (payload) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting task_assigned for task: ${payload.taskId}`);
+  
+  // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('task_assigned', payload);
   if (payload.assignedUserId) {
     io.to(`user_${payload.assignedUserId}`).emit('task_assigned', payload);
+  }
+
+  // Mobile clients (encrypted)
+  const encPayload = encryptPayload(payload);
+  io.to('role_ADMIN_mobile').to('role_MANAGER_mobile').emit('task_assigned', encPayload);
+  if (payload.assignedUserId) {
+    io.to(`user_${payload.assignedUserId}_mobile`).emit('task_assigned', encPayload);
   }
 };
 
@@ -198,9 +258,18 @@ const emitTaskAssigned = (payload) => {
 const emitNewComment = (payload) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting new_comment for task: ${payload.taskId}`);
+  
+  // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('new_comment', payload);
   if (payload.assignedUserId) {
     io.to(`user_${payload.assignedUserId}`).emit('new_comment', payload);
+  }
+
+  // Mobile clients (encrypted)
+  const encPayload = encryptPayload(payload);
+  io.to('role_ADMIN_mobile').to('role_MANAGER_mobile').emit('new_comment', encPayload);
+  if (payload.assignedUserId) {
+    io.to(`user_${payload.assignedUserId}_mobile`).emit('new_comment', encPayload);
   }
 };
 
@@ -212,7 +281,13 @@ const emitNewComment = (payload) => {
 const emitNewNotification = (notification) => {
   if (!io) return;
   console.log(`[Socket.IO] Emitting new_notification to room: user_${notification.userId}`);
+  
+  // Web clients (unencrypted)
   io.to(`user_${notification.userId}`).emit('new_notification', notification);
+
+  // Mobile clients (encrypted)
+  const encPayload = encryptPayload(notification);
+  io.to(`user_${notification.userId}_mobile`).emit('new_notification', encPayload);
 };
 
 module.exports = {

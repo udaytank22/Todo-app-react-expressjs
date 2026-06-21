@@ -23,6 +23,8 @@ const customerAssignmentRoutes = require('./routes/customerAssignmentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const { prometheus, metricsMiddleware, checkHealth } = require('./utils/monitoring');
 const logger = require('./utils/logger');
+const encryptionMiddleware = require('./middleware/encryption');
+
 
 // Utils / External services
 const { isConnected, fetchEmails } = require('./services/outlook');
@@ -61,12 +63,13 @@ const startServer = async () => {
     cors({
       origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-client-device', 'x-client-encrypted'],
     })
   );
 
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  app.use(encryptionMiddleware);
   app.use(express.static(path.join(__dirname, '../public')));
 
   // Prometheus metrics middleware
