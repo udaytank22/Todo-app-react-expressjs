@@ -405,10 +405,8 @@ const List = ({ socket, searchVal }) => {
                                 value={editForm.status}
                                 onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                                 options={[
-                                    { value: 'NEW_EMAIL', label: 'New Email' },
-                                    { value: 'PENDING_REVIEW', label: 'Pending Review' },
+                                    { value: 'PENDING', label: 'Pending' },
                                     { value: 'IN_PROGRESS', label: 'In Progress' },
-                                    { value: 'WAITING_FOR_CLIENT', label: 'Waiting for Client' },
                                     { value: 'COMPLETED', label: 'Completed' },
                                     { value: 'CANCELLED', label: 'Cancelled' }
                                 ]}

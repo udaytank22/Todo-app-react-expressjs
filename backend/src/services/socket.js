@@ -131,6 +131,22 @@ const initSocket = (server, pubClient = null, subClient = null) => {
         // Emit to mobile clients (encrypted)
         const encryptedMessage = { encryptedData: encrypt(JSON.stringify(message)) };
         io.to(`user_${socket.userId}_mobile`).to(`user_${receiverId}_mobile`).emit('receive_direct_message', encryptedMessage);
+
+        // Also create a Notification for the receiver
+        const notification = await prisma.notification.create({
+          data: {
+            userId: receiverId,
+            type: 'DIRECT_MESSAGE',
+            title: `New message from ${message.sender.name}`,
+            message: content.trim(),
+            relatedId: message.id,
+          },
+        });
+
+        io.to(`user_${receiverId}`).emit('new_notification', notification);
+        const encNotification = { encryptedData: encrypt(JSON.stringify(notification)) };
+        io.to(`user_${receiverId}_mobile`).emit('new_notification', encNotification);
+
       } catch (error) {
         console.error('[Socket.IO] Failed to process send_direct_message:', error);
       }
@@ -184,7 +200,7 @@ const emitNewInquiry = (task) => {
     customerName: task.customerName,
     senderEmail: task.senderEmail,
     description: task.description || '',
-    status: task.status || 'NEW_EMAIL',
+    status: task.status || 'PENDING',
     priority: task.priority || 'MEDIUM',
     createdAt: task.createdAt,
     updatedAt: task.updatedAt || task.createdAt,

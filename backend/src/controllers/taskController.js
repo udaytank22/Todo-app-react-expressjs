@@ -92,13 +92,12 @@ const getAllTasks = async (req, res) => {
       where.customerName = { contains: customer, mode: 'insensitive' };
     }
     if (search) {
-      const tsquery = search.trim().split(/\s+/).join(' | ');
       where.OR = [
-        { subject: { search: tsquery } },
-        { description: { search: tsquery } },
-        { customerName: { search: tsquery } },
-        { senderEmail: { search: tsquery } },
-        { inquiryId: { search: tsquery } },
+        { subject: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { customerName: { contains: search, mode: 'insensitive' } },
+        { senderEmail: { contains: search, mode: 'insensitive' } },
+        { inquiryId: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (unassigned === 'true') {
@@ -127,10 +126,7 @@ const getAllTasks = async (req, res) => {
 
     // --- Fetch live Outlook emails if conditions are met ---
     let liveEmails = [];
-    if (
-      isConnected() &&
-      !status && !priority && !search && !customer
-    ) {
+    if (isConnected()) {
       const cachedLiveEmails = await cache.get('live_emails');
       if (cachedLiveEmails) {
         liveEmails = cachedLiveEmails;
@@ -191,7 +187,7 @@ const getAllTasks = async (req, res) => {
             customerName: email.senderName,
             senderEmail: email.senderEmail,
             description: email.body,
-            status: 'NEW_EMAIL',
+            status: 'PENDING',
             priority: 'MEDIUM',
             dueDate: null,
             externalLink: null,
@@ -215,6 +211,25 @@ const getAllTasks = async (req, res) => {
       }
     }
 
+    if (status) {
+      liveEmails = liveEmails.filter(e => e.status === status.toUpperCase());
+    }
+    if (priority) {
+      liveEmails = liveEmails.filter(e => e.priority === priority.toUpperCase());
+    }
+    if (customer) {
+      liveEmails = liveEmails.filter(e => e.customerName && e.customerName.toLowerCase().includes(customer.toLowerCase()));
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      liveEmails = liveEmails.filter(e => 
+        (e.subject && e.subject.toLowerCase().includes(q)) ||
+        (e.description && e.description.toLowerCase().includes(q)) ||
+        (e.customerName && e.customerName.toLowerCase().includes(q)) ||
+        (e.senderEmail && e.senderEmail.toLowerCase().includes(q)) ||
+        (e.inquiryId && e.inquiryId.toLowerCase().includes(q))
+      );
+    }
     if (unassigned === 'true') {
       liveEmails = liveEmails.filter(e => e.assignedUserId === null);
     }
@@ -377,7 +392,7 @@ const getTaskById = async (req, res) => {
           customerName: matchedEmail.senderName,
           senderEmail: matchedEmail.senderEmail,
           description: matchedEmail.body,
-          status: 'NEW_EMAIL',
+          status: 'PENDING',
           priority: 'MEDIUM',
           dueDate: null,
           externalLink: null,
@@ -433,7 +448,7 @@ const createTask = async (req, res) => {
         customerName,
         senderEmail: senderEmail || 'manual@system.com',
         description,
-        status: (status || 'NEW_EMAIL').toUpperCase(),
+        status: (status || 'PENDING').toUpperCase(),
         priority: (priority || 'MEDIUM').toUpperCase(),
         dueDate: dueDate ? new Date(dueDate) : null,
         externalLink: externalLink || null,
@@ -565,7 +580,7 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
           customerName: matchedEmail.senderName,
           senderEmail: matchedEmail.senderEmail,
           description: matchedEmail.body || '',
-          status: 'NEW_EMAIL',
+          status: 'PENDING',
           priority: 'MEDIUM',
           emailId: emailRecord.id,
           assignedUserId: matchedUserId || null,
@@ -594,7 +609,7 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
         data: {
           taskId: newTask.id,
           fromStatus: 'NONE',
-          toStatus: 'NEW_EMAIL',
+          toStatus: 'PENDING',
           changedById: reqUser.id,
         }
       });

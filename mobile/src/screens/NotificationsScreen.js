@@ -83,8 +83,10 @@ const NotificationsScreen = ({ navigation }) => {
     if (!item.isRead) {
       handleMarkRead(item.id);
     }
-    // Navigate to details screen
-    navigation.navigate('InquiryDetails', { id: item.relatedId });
+    // Navigate to details screen unless it's a direct message
+    if (item.type !== 'DIRECT_MESSAGE') {
+      navigation.navigate('InquiryDetails', { id: item.relatedId });
+    }
   };
 
   const filteredNotifications = notifications.filter((n) => {
@@ -98,6 +100,7 @@ const NotificationsScreen = ({ navigation }) => {
     switch (type) {
       case 'ASSIGNMENT':
         return '👥';
+      case 'DIRECT_MESSAGE':
       case 'NEW_COMMENT':
         return '💬';
       case 'STATUS_UPDATE':

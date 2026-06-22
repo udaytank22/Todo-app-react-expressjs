@@ -47,7 +47,7 @@ model Task {
   customerName    String
   senderEmail     String
   description     String          @db.Text
-  status          String          // "NEW_EMAIL", "PENDING_REVIEW", "IN_PROGRESS", "WAITING_FOR_CLIENT", "COMPLETED", "CANCELLED"
+  status          String          // "PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"
   priority        String          // "LOW", "MEDIUM", "HIGH", "URGENT"
   dueDate         DateTime?
   externalLink    String?

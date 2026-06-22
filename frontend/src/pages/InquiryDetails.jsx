@@ -334,8 +334,12 @@ const InquiryDetails = () => {
                             <h4 className="text-sm font-bold text-slate-900">
                                 {task.subject}
                             </h4>
-                            <div className="rounded-xl bg-white/50 p-4 border border-black/5 max-h-[300px] overflow-y-auto text-xs text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">
-                                {task.description}
+                            <div className="rounded-xl bg-white p-4 border border-black/5 max-h-[500px] overflow-y-auto text-xs text-slate-700 leading-relaxed font-sans">
+                                {task.inquiryId?.includes('LIVE') || task.email?.body ? (
+                                    <div dangerouslySetInnerHTML={{ __html: task.inquiryId?.includes('LIVE') ? task.description : task.email.body }} />
+                                ) : (
+                                    <div className="whitespace-pre-wrap">{task.description}</div>
+                                )}
                             </div>
                         </div>
 

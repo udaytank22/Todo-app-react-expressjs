@@ -21,7 +21,7 @@ const ListScreen = ({ navigation }) => {
 
   // Filters
   const [searchVal, setSearchVal] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('PENDING');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' or 'priority'
 
@@ -83,12 +83,9 @@ const ListScreen = ({ navigation }) => {
     });
 
   const statuses = [
-    { label: 'ALL', value: '' },
-    { label: 'New', value: 'NEW_EMAIL' },
-    { label: 'Review', value: 'PENDING_REVIEW' },
-    { label: 'Progress', value: 'IN_PROGRESS' },
-    { label: 'Waiting', value: 'WAITING_FOR_CLIENT' },
-    { label: 'Done', value: 'COMPLETED' },
+    { label: 'Pending', value: 'PENDING' },
+    { label: 'In Progress', value: 'IN_PROGRESS' },
+    { label: 'Completed', value: 'COMPLETED' },
     { label: 'Cancelled', value: 'CANCELLED' },
   ];
 

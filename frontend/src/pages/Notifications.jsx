@@ -43,7 +43,9 @@ const Notifications = () => {
         if (!notification.isRead) {
             dispatch(markNotificationRead(notification.id));
         }
-        navigate(`/inquiry/${notification.relatedId}`);
+        if (notification.type !== 'DIRECT_MESSAGE') {
+            navigate(`/inquiry/${notification.relatedId}`);
+        }
     };
 
     // Filter notifications
@@ -82,6 +84,7 @@ const Notifications = () => {
                         <UserCheck className="h-5 w-5" />
                     </div>
                 );
+            case 'DIRECT_MESSAGE':
             case 'NEW_COMMENT':
                 return (
                     <div className="bg-violet-500/10 p-2.5 rounded-xl border border-violet-500/20 text-violet-400">

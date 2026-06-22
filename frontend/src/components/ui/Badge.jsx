@@ -29,15 +29,10 @@ const Badge = ({
     const s = status.toUpperCase().replace(/\s+/g, '_');
 
     switch (s) {
-      case 'NEW_EMAIL':
-      case 'NEW':
+      case 'PENDING':
         return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
-      case 'PENDING_REVIEW':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
       case 'IN_PROGRESS':
         return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
-      case 'WAITING_FOR_CLIENT':
-        return 'bg-pink-500/10 text-pink-400 border-pink-500/20';
       case 'COMPLETED':
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'CANCELLED':
@@ -50,14 +45,10 @@ const Badge = ({
   const getStatusLabel = (status) => {
     const s = status.toUpperCase().replace(/\s+/g, '_');
     switch (s) {
-      case 'NEW_EMAIL':
-        return 'New Email';
-      case 'PENDING_REVIEW':
-        return 'Pending Review';
+      case 'PENDING':
+        return 'Pending';
       case 'IN_PROGRESS':
         return 'In Progress';
-      case 'WAITING_FOR_CLIENT':
-        return 'Waiting for Client';
       case 'COMPLETED':
         return 'Completed';
       case 'CANCELLED':

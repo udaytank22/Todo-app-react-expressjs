@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { MessageSquare, X, Send, ChevronLeft } from 'lucide-react';
+import { MessageSquare, X, Send, ChevronLeft, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -14,6 +16,12 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const popoverRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const searchRef = useRef(null);
+
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
 
@@ -104,10 +112,39 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
       if (popoverRef.current && !popoverRef.current.contains(event.target)) {
         setIsChatOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!globalSearchQuery || globalSearchQuery.trim().length === 0) {
+      setSearchResults([]);
+      setIsSearchOpen(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`/api/search?q=${encodeURIComponent(globalSearchQuery)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        setSearchResults(response.data);
+        setIsSearchOpen(true);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [globalSearchQuery]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -122,19 +159,47 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   return (
     <header className="h-10 min-h-14 px-5 glass-panel border-x-0 border-t-0 border-b border-black/5 flex items-center justify-between transition-all duration-300 relative z-30">
-      {/* Search Input */}
       <div className="w-96">
-        {onSearchChange && (
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search inquiries, customer, subject..."
-              value={searchVal || ''}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-white/50 border border-black/5 rounded-xl px-2 py-1.5 text-sm outline-none transition-all focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/10 placeholder-slate-500 text-slate-800"
-            />
-          </div>
-        )}
+        <div className="relative" ref={searchRef}>
+          <input
+            type="text"
+            placeholder="Search inquiries, customer, subject..."
+            value={globalSearchQuery}
+            onChange={(e) => setGlobalSearchQuery(e.target.value)}
+            onFocus={() => { if(globalSearchQuery && globalSearchQuery.trim().length > 0) setIsSearchOpen(true); }}
+            className="w-full bg-white/50 border border-black/5 rounded-xl px-2 py-1.5 text-sm outline-none transition-all focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/10 placeholder-slate-500 text-slate-800"
+          />
+          {isSearchOpen && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white border border-black/10 rounded-xl shadow-xl overflow-hidden z-50">
+              {isSearching ? (
+                <div className="p-4 flex justify-center text-slate-400">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="max-h-64 overflow-y-auto">
+                  {searchResults.map((result) => (
+                    <div
+                      key={result.id}
+                      onClick={() => {
+                        setIsSearchOpen(false);
+                        navigate(`/inquiry/${result.id}`);
+                      }}
+                      className="p-3 hover:bg-slate-50 cursor-pointer border-b border-black/5 last:border-0"
+                    >
+                      <div className="text-sm font-semibold text-slate-800 truncate">{result.subject}</div>
+                      <div className="text-xs text-slate-500 flex justify-between mt-1">
+                        <span className="truncate max-w-[70%]">{result.customerName}</span>
+                        <span className="uppercase text-[9px] font-bold text-sky-500 bg-sky-50 px-1.5 py-0.5 rounded">{result.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-sm text-slate-500 text-center">No matching inquiries found.</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Action Buttons */}

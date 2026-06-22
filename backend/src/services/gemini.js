@@ -282,7 +282,7 @@ const analyzeInquiryWithGemini = createCircuitBreaker(rawAnalyzeInquiryWithGemin
         customerName: name || emailAddress || 'Unknown Client',
         description: text || 'No description provided.',
         priority,
-        status: 'NEW_EMAIL',
+        status: 'PENDING',
         dueDate: null,
       };
     };

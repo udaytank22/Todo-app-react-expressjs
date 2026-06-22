@@ -44,18 +44,16 @@ const DashboardScreen = ({ navigation }) => {
 
   // Metrics
   const totalInquiries = tasks.length;
-  const newEmails = tasks.filter((t) => t.status === 'NEW_EMAIL').length;
-  const pendingReview = tasks.filter((t) => t.status === 'PENDING_REVIEW').length;
+  const pendingTasks = tasks.filter((t) => t.status === 'PENDING').length;
+  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
   const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
   const highPriority = tasks.filter((t) => ['HIGH', 'URGENT'].includes(t.priority)).length;
 
   const recentInquiries = tasks.slice(0, 5);
 
   const statuses = [
-    { label: 'New Email', key: 'NEW_EMAIL', color: '#8b5cf6' }, // Violet
-    { label: 'Pending Review', key: 'PENDING_REVIEW', color: '#f59e0b' }, // Amber
+    { label: 'Pending', key: 'PENDING', color: '#8b5cf6' }, // Violet
     { label: 'In Progress', key: 'IN_PROGRESS', color: '#0ea5e9' }, // Sky
-    { label: 'Waiting for Client', key: 'WAITING_FOR_CLIENT', color: '#ec4899' }, // Pink
     { label: 'Completed', key: 'COMPLETED', color: '#10b981' }, // Emerald
     { label: 'Cancelled', key: 'CANCELLED', color: '#ef4444' }, // Red
   ];
@@ -103,14 +101,14 @@ const DashboardScreen = ({ navigation }) => {
           </View>
 
           <View style={[styles.metricCard, { borderLeftColor: '#8b5cf6' }]}>
-            <Text style={styles.metricLabel}>New Emails</Text>
-            <Text style={[styles.metricVal, { color: '#8b5cf6' }]}>{newEmails}</Text>
+            <Text style={styles.metricLabel}>Pending</Text>
+            <Text style={[styles.metricVal, { color: '#8b5cf6' }]}>{pendingTasks}</Text>
             <Text style={styles.metricIcon}>✉️</Text>
           </View>
 
           <View style={[styles.metricCard, { borderLeftColor: '#f59e0b' }]}>
-            <Text style={styles.metricLabel}>Pending Review</Text>
-            <Text style={[styles.metricVal, { color: '#f59e0b' }]}>{pendingReview}</Text>
+            <Text style={styles.metricLabel}>In Progress</Text>
+            <Text style={[styles.metricVal, { color: '#f59e0b' }]}>{inProgressTasks}</Text>
             <Text style={styles.metricIcon}>⏳</Text>
           </View>
 

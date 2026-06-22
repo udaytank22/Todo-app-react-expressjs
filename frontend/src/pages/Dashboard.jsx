@@ -24,15 +24,15 @@ const Dashboard = () => {
 
   // Compute metrics
   const totalInquiries = tasks.length;
-  const newEmails = tasks.filter(t => t.status === 'NEW_EMAIL').length;
-  const pendingTasks = tasks.filter(t => t.status === 'PENDING_REVIEW').length;
+  const pendingTasks = tasks.filter(t => t.status === 'PENDING').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS').length;
   const completedTasks = tasks.filter(t => t.status === 'COMPLETED').length;
   const highPriority = tasks.filter(t => ['HIGH', 'URGENT'].includes(t.priority)).length;
 
   const recentInquiries = tasks.slice(0, 5); // top 5 recent tasks
 
   // Status distributions
-  const statuses = ['NEW_EMAIL', 'PENDING_REVIEW', 'IN_PROGRESS', 'WAITING_FOR_CLIENT', 'COMPLETED', 'CANCELLED'];
+  const statuses = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
   const statusCounts = statuses.reduce((acc, status) => {
     acc[status] = tasks.filter(t => t.status === status).length;
     return acc;
@@ -95,10 +95,10 @@ const Dashboard = () => {
             <Mail className="h-5 w-5 mr-[-6px] mt-[-6px]" />
           </div>
           <p className="text-xs font-semibold text-slate-600 tracking-wider uppercase">
-            New Emails
+            Pending Tasks
           </p>
           <h3 className="text-3xl font-extrabold text-violet-400 mt-2 font-sans tracking-tight">
-            {newEmails}
+            {pendingTasks}
           </h3>
         </Card>
 
@@ -107,10 +107,10 @@ const Dashboard = () => {
             <Clock className="h-5 w-5 mr-[-6px] mt-[-6px]" />
           </div>
           <p className="text-xs font-semibold text-slate-600 tracking-wider uppercase">
-            Pending Review
+            In Progress
           </p>
           <h3 className="text-3xl font-extrabold text-amber-400 mt-2 font-sans tracking-tight">
-            {pendingTasks}
+            {inProgressTasks}
           </h3>
         </Card>
 
@@ -206,19 +206,15 @@ const Dashboard = () => {
 
                 // Color maps for charts
                 const barColors = {
-                  NEW_EMAIL: 'bg-violet-500',
-                  PENDING_REVIEW: 'bg-amber-500',
+                  PENDING: 'bg-violet-500',
                   IN_PROGRESS: 'bg-sky-500',
-                  WAITING_FOR_CLIENT: 'bg-pink-500',
                   COMPLETED: 'bg-emerald-500',
                   CANCELLED: 'bg-rose-500',
                 };
 
                 const labels = {
-                  NEW_EMAIL: 'New Email',
-                  PENDING_REVIEW: 'Pending Review',
+                  PENDING: 'Pending',
                   IN_PROGRESS: 'In Progress',
-                  WAITING_FOR_CLIENT: 'Waiting for Client',
                   COMPLETED: 'Completed',
                   CANCELLED: 'Cancelled',
                 };

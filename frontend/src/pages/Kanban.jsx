@@ -16,10 +16,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { fetchTasks, updateTaskStatus } from '../store/tasksSlice';
 
 const COLUMNS = [
-    { id: 'NEW_EMAIL', title: 'New Email' },
-    { id: 'PENDING_REVIEW', title: 'Pending Review' },
+    { id: 'PENDING', title: 'Pending' },
     { id: 'IN_PROGRESS', title: 'In Progress' },
-    { id: 'WAITING_FOR_CLIENT', title: 'Waiting for Client' },
     { id: 'COMPLETED', title: 'Completed' },
     { id: 'CANCELLED', title: 'Cancelled' },
 ];

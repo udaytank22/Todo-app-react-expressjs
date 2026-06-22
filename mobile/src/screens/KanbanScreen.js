@@ -18,10 +18,8 @@ import { onSocketEvent, offSocketEvent } from '../services/socket';
 import { COLORS } from '../utils/theme';
 
 const COLUMNS = [
-  { id: 'NEW_EMAIL', title: 'New Email', icon: '✉️', color: '#8b5cf6' },
-  { id: 'PENDING_REVIEW', title: 'Pending Review', icon: '⏳', color: '#f59e0b' },
+  { id: 'PENDING', title: 'Pending', icon: '✉️', color: '#8b5cf6' },
   { id: 'IN_PROGRESS', title: 'In Progress', icon: '⚡', color: '#0ea5e9' },
-  { id: 'WAITING_FOR_CLIENT', title: 'Waiting Client', icon: '💬', color: '#ec4899' },
   { id: 'COMPLETED', title: 'Completed', icon: '✅', color: '#10b981' },
   { id: 'CANCELLED', title: 'Cancelled', icon: '❌', color: '#ef4444' },
 ];
@@ -32,7 +30,7 @@ const KanbanScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   
   // Filtering states
-  const [activeTab, setActiveTab] = useState('NEW_EMAIL');
+  const [activeTab, setActiveTab] = useState('PENDING');
   const [searchVal, setSearchVal] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   

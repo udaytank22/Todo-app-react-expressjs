@@ -52,7 +52,7 @@ const processEmails = async () => {
           customerName: email.senderName,
           senderEmail: email.senderEmail,
           description: email.body,
-          status: 'NEW_EMAIL',
+          status: 'PENDING',
           priority: 'MEDIUM',
           dueDate: null,
           externalLink: null,
@@ -97,7 +97,7 @@ const processEmails = async () => {
                 customerName: email.senderName,
                 senderEmail: email.senderEmail,
                 description: email.body || '',
-                status: 'NEW_EMAIL',
+                status: 'PENDING',
                 priority: 'MEDIUM',
                 emailId: emailRecord.id,
                 assignedUserId: matchedUserId,
@@ -115,7 +115,7 @@ const processEmails = async () => {
               data: {
                 taskId: task.id,
                 fromStatus: 'NONE',
-                toStatus: 'NEW_EMAIL',
+                toStatus: 'PENDING',
                 changedById: null,
               },
             });
