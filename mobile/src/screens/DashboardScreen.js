@@ -72,6 +72,76 @@ const DashboardScreen = ({ navigation }) => {
     );
   }
 
+  const getRoleBadgeText = (role) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'ADMIN ACCESS';
+      case 'MANAGER':
+        return 'MANAGER ACCESS';
+      default:
+        return 'STAFF ACCESS';
+    }
+  };
+
+  const getStatusBadgeStyle = (status) => {
+    switch (status) {
+      case 'PENDING':
+        return { bg: 'rgba(2, 132, 199, 0.08)', text: '#0284c7' };
+      case 'IN_PROGRESS':
+        return { bg: 'rgba(245, 158, 11, 0.08)', text: '#f59e0b' };
+      case 'COMPLETED':
+        return { bg: 'rgba(16, 185, 129, 0.08)', text: '#10b981' };
+      case 'WAITING_FOR_CLIENT':
+        return { bg: 'rgba(180, 83, 9, 0.08)', text: '#b45309' };
+      default:
+        return { bg: 'rgba(148, 163, 184, 0.12)', text: '#64748b' };
+    }
+  };
+
+  const renderMetricIcon = (type) => {
+    switch (type) {
+      case 'total':
+        return (
+          <View style={styles.iconBarChart}>
+            <View style={[styles.bar, { height: 6, backgroundColor: COLORS.primary }]} />
+            <View style={[styles.bar, { height: 14, backgroundColor: COLORS.primary }]} />
+            <View style={[styles.bar, { height: 10, backgroundColor: COLORS.primary }]} />
+          </View>
+        );
+      case 'pending':
+        return (
+          <View style={styles.iconEnvelope}>
+            <View style={[styles.envelopeBody, { borderColor: '#8b5cf6' }]} />
+            <View style={[styles.envelopeV, { borderTopColor: '#8b5cf6' }]} />
+          </View>
+        );
+      case 'in_progress':
+        return (
+          <View style={styles.iconHourglass}>
+            <View style={[styles.hourglassTop, { borderBottomColor: '#f59e0b' }]} />
+            <View style={[styles.hourglassBottom, { borderTopColor: '#f59e0b' }]} />
+          </View>
+        );
+      case 'completed':
+        return (
+          <View style={[styles.iconCheckCircle, { borderColor: '#10b981' }]}>
+            <View style={[styles.checkMark, { borderColor: '#10b981' }]} />
+          </View>
+        );
+      case 'high_priority':
+        return (
+          <View style={styles.iconWarningContainer}>
+            <View style={styles.iconWarning}>
+              <View style={[styles.warningTriangle, { borderBottomColor: '#ef4444' }]} />
+              <Text style={styles.warningExclamation}>!</Text>
+            </View>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -82,46 +152,58 @@ const DashboardScreen = ({ navigation }) => {
       >
         {/* Header Profile Section */}
         <View style={styles.profileSection}>
-          <View>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>{user?.name || 'Team Member'}</Text>
-            <Text style={styles.userRole}>{user?.role || 'Staff'}</Text>
+          <Text style={styles.welcomeText}>Welcome back,</Text>
+          <Text style={styles.userName}>{user?.name || 'Team Member'}</Text>
+          <View style={styles.roleBadge}>
+            <View style={styles.roleBadgeDot} />
+            <Text style={styles.roleBadgeText}>{getRoleBadgeText(user?.role)}</Text>
           </View>
-          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-            <Text style={styles.logoutText}>Log Out 🚪</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Metrics Grid */}
-        <View style={styles.metricsGrid}>
-          <View style={[styles.metricCard, { borderLeftColor: COLORS.primary }]}>
-            <Text style={styles.metricLabel}>Total Inquiries</Text>
-            <Text style={styles.metricVal}>{totalInquiries}</Text>
-            <Text style={styles.metricIcon}>📊</Text>
+        {/* Metrics Container */}
+        <View style={styles.metricsContainer}>
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricCard, { borderLeftColor: COLORS.primary }]}>
+              <View style={styles.metricHeader}>
+                <Text style={styles.metricLabel}>Total Inquiries</Text>
+                {renderMetricIcon('total')}
+              </View>
+              <Text style={styles.metricVal}>{totalInquiries}</Text>
+            </View>
+
+            <View style={[styles.metricCard, { borderLeftColor: '#8b5cf6' }]}>
+              <View style={styles.metricHeader}>
+                <Text style={styles.metricLabel}>Pending</Text>
+                {renderMetricIcon('pending')}
+              </View>
+              <Text style={[styles.metricVal, { color: '#8b5cf6' }]}>{pendingTasks}</Text>
+            </View>
           </View>
 
-          <View style={[styles.metricCard, { borderLeftColor: '#8b5cf6' }]}>
-            <Text style={styles.metricLabel}>Pending</Text>
-            <Text style={[styles.metricVal, { color: '#8b5cf6' }]}>{pendingTasks}</Text>
-            <Text style={styles.metricIcon}>✉️</Text>
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricCard, { borderLeftColor: '#b45309' }]}>
+              <View style={styles.metricHeader}>
+                <Text style={styles.metricLabel}>In Progress</Text>
+                {renderMetricIcon('in_progress')}
+              </View>
+              <Text style={[styles.metricVal, { color: '#b45309' }]}>{inProgressTasks}</Text>
+            </View>
+
+            <View style={[styles.metricCard, { borderLeftColor: '#10b981' }]}>
+              <View style={styles.metricHeader}>
+                <Text style={styles.metricLabel}>Completed</Text>
+                {renderMetricIcon('completed')}
+              </View>
+              <Text style={[styles.metricVal, { color: '#10b981' }]}>{completedTasks}</Text>
+            </View>
           </View>
 
-          <View style={[styles.metricCard, { borderLeftColor: '#f59e0b' }]}>
-            <Text style={styles.metricLabel}>In Progress</Text>
-            <Text style={[styles.metricVal, { color: '#f59e0b' }]}>{inProgressTasks}</Text>
-            <Text style={styles.metricIcon}>⏳</Text>
-          </View>
-
-          <View style={[styles.metricCard, { borderLeftColor: '#10b981' }]}>
-            <Text style={styles.metricLabel}>Completed</Text>
-            <Text style={[styles.metricVal, { color: '#10b981' }]}>{completedTasks}</Text>
-            <Text style={styles.metricIcon}>✅</Text>
-          </View>
-
-          <View style={[styles.metricCard, { borderLeftColor: '#ef4444' }]}>
-            <Text style={styles.metricLabel}>High Priority</Text>
+          <View style={[styles.metricCardFull, { borderLeftColor: '#ef4444' }]}>
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricLabel}>High Priority</Text>
+              {renderMetricIcon('high_priority')}
+            </View>
             <Text style={[styles.metricVal, { color: '#ef4444' }]}>{highPriority}</Text>
-            <Text style={styles.metricIcon}>⚠️</Text>
           </View>
         </View>
 
@@ -134,39 +216,63 @@ const DashboardScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.listCard}>
+          <View style={styles.recentInquiriesList}>
             {recentInquiries.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No recent inquiries found.</Text>
+              <View style={styles.listCard}>
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No recent inquiries found.</Text>
+                </View>
               </View>
             ) : (
-              recentInquiries.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.listItem,
-                    index === recentInquiries.length - 1 && styles.listItemLast,
-                  ]}
-                  onPress={() => navigation.navigate('InquiryDetails', { id: item.id })}
-                >
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemSubject} numberOfLines={1}>
-                      {item.subject}
-                    </Text>
-                    <Text style={styles.itemCustomer} numberOfLines={1}>
-                      Customer: {item.customerName}
-                    </Text>
-                  </View>
-                  <View style={styles.itemBadges}>
-                    <Text style={[styles.badge, styles.badgePriority, { backgroundColor: item.priority === 'HIGH' || item.priority === 'URGENT' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(241, 245, 249, 0.8)' }]}>
-                      {item.priority}
-                    </Text>
-                    <Text style={[styles.badge, styles.badgeStatus]}>
-                      {item.status.replace('_', ' ')}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))
+              recentInquiries.map((item) => {
+                const statusStyle = getStatusBadgeStyle(item.status);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.inquiryCard}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('InquiryDetails', { id: item.id })}
+                  >
+                    <View style={styles.inquiryLeft}>
+                      <Text style={styles.inquirySubject} numberOfLines={2}>
+                        {item.subject}
+                      </Text>
+                      <View style={styles.inquirySenderRow}>
+                        <Text style={styles.inquirySenderIcon}>👤</Text>
+                        <Text style={styles.inquirySenderName} numberOfLines={1}>
+                          {item.customerName || item.senderEmail}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.inquiryRight}>
+                      <View style={[
+                        styles.priorityBadge,
+                        item.priority === 'HIGH' || item.priority === 'URGENT' ? styles.badgeHigh : styles.badgeNormal
+                      ]}>
+                        <Text style={[
+                          styles.priorityText,
+                          item.priority === 'HIGH' || item.priority === 'URGENT' ? styles.textHigh : styles.textNormal
+                        ]}>
+                          {item.priority}
+                        </Text>
+                      </View>
+                      
+                      <View style={[
+                        styles.statusBadge,
+                        { backgroundColor: statusStyle.bg }
+                      ]}>
+                        <Text style={[
+                          styles.statusText,
+                          { color: statusStyle.text }
+                        ]}>
+                          {item.status.replace('_', ' ')}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
             )}
           </View>
         </View>
@@ -226,82 +332,215 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   profileSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    gap: 2,
   },
   welcomeText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontWeight: '500',
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textDark,
-  },
-  userRole: {
     fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginTop: 2,
+    color: COLORS.textMuted,
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  logoutButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.15)',
+  userName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.textDark,
   },
-  logoutText: {
-    color: COLORS.danger,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  metricsGrid: {
+  roleBadge: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  roleBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+    marginRight: 6,
+  },
+  roleBadgeText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  metricsContainer: {
+    gap: 12,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 12,
   },
   metricCard: {
-    width: '48%',
+    flex: 1,
     backgroundColor: COLORS.white,
     borderRadius: 16,
     padding: 16,
     borderLeftWidth: 4,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-    position: 'relative',
-    overflow: 'hidden',
+    justifyContent: 'space-between',
+    minHeight: 92,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1.5,
+  },
+  metricCardFull: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    justifyContent: 'space-between',
+    minHeight: 92,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1.5,
+  },
+  metricHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   metricLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: COLORS.textMuted,
+    flex: 1,
+    paddingRight: 4,
   },
   metricVal: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: COLORS.textDark,
-    marginTop: 4,
+    marginTop: 6,
   },
-  metricIcon: {
+  // Custom drawn metric icons
+  iconBarChart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    width: 20,
+    height: 18,
+    justifyContent: 'flex-end',
+  },
+  bar: {
+    width: 3.5,
+    borderRadius: 1,
+  },
+  iconEnvelope: {
+    width: 20,
+    height: 14,
+    position: 'relative',
+    marginTop: 2,
+  },
+  envelopeBody: {
+    width: 20,
+    height: 14,
+    borderWidth: 2,
+    borderRadius: 3.5,
+  },
+  envelopeV: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    fontSize: 20,
-    opacity: 0.15,
+    top: 2,
+    left: 2,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 8,
+    borderRightColor: 'transparent',
+    borderTopWidth: 6,
+  },
+  iconHourglass: {
+    width: 16,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1.5,
+    marginTop: 2,
+  },
+  hourglassTop: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 7,
+    borderRightColor: 'transparent',
+    borderTopWidth: 8,
+  },
+  hourglassBottom: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 7,
+    borderRightColor: 'transparent',
+    borderBottomWidth: 8,
+  },
+  iconCheckCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkMark: {
+    width: 8,
+    height: 4,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    transform: [{ rotate: '-45deg' }],
+    top: -1,
+  },
+  iconWarningContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWarning: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  warningTriangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 8,
+    borderRightColor: 'transparent',
+    borderBottomWidth: 14,
+  },
+  warningExclamation: {
+    position: 'absolute',
+    color: '#ef4444',
+    fontSize: 9,
+    fontWeight: 'bold',
+    bottom: 1.5,
   },
   section: {
-    gap: 10,
+    gap: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -309,8 +548,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     color: COLORS.textDark,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -318,7 +557,89 @@ const styles = StyleSheet.create({
   sectionLink: {
     fontSize: 13,
     color: COLORS.primary,
+    fontWeight: '700',
+  },
+  recentInquiriesList: {
+    gap: 10,
+  },
+  inquiryCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1.5,
+  },
+  inquiryLeft: {
+    flex: 1,
+    paddingRight: 12,
+    gap: 10,
+  },
+  inquirySubject: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    lineHeight: 20,
+  },
+  inquirySenderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  inquirySenderIcon: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  inquirySenderName: {
+    fontSize: 12,
     fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  inquiryRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    minHeight: 52,
+    gap: 8,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  priorityText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  badgeHigh: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  textHigh: {
+    color: '#ef4444',
+  },
+  badgeNormal: {
+    backgroundColor: 'rgba(148, 163, 184, 0.12)',
+  },
+  textNormal: {
+    color: '#64748b',
   },
   listCard: {
     backgroundColor: COLORS.white,
@@ -334,50 +655,6 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.textMuted,
     fontSize: 14,
-  },
-  listItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  listItemLast: {
-    borderBottomWidth: 0,
-  },
-  itemContent: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  itemSubject: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textDark,
-  },
-  itemCustomer: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 4,
-  },
-  itemBadges: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  badge: {
-    fontSize: 9,
-    fontWeight: '700',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  badgePriority: {
-    color: COLORS.textDark,
-  },
-  badgeStatus: {
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
-    color: COLORS.primary,
   },
   breakdownRow: {
     padding: 14,

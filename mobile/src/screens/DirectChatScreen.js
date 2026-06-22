@@ -78,7 +78,7 @@ const DirectChatScreen = ({ route, navigation }) => {
       setActiveChatUser(null);
       offSocketEvent('receive_direct_message', handleReceiveMessage);
     };
-  }, [otherUser.id, currentUser]);
+  }, [otherUser.id, currentUser, setActiveChatUser]);
 
   // Auto scroll to bottom and track keyboard visibility
   useEffect(() => {

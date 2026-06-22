@@ -15,6 +15,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { onSocketEvent, offSocketEvent } from '../services/socket';
@@ -28,7 +29,7 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
   const [task, setTask] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Comment states
   const [newComment, setNewComment] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
@@ -39,6 +40,36 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
   const [priorityModalVisible, setPriorityModalVisible] = useState(false);
   const [assigneeModalVisible, setAssigneeModalVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  const [webViewHeight, setWebViewHeight] = useState(250);
+
+  const onWebViewMessage = (event) => {
+    try {
+      const height = Number(event.nativeEvent.data);
+      if (height && height > 0) {
+        setWebViewHeight(height + 24);
+      }
+    } catch (e) {
+      console.warn('[Details Screen] WebView height parse error:', e);
+    }
+  };
+
+  const injectedJavaScript = `
+    (function() {
+      function sendHeight() {
+        window.ReactNativeWebView.postMessage(
+          Math.max(document.body.scrollHeight, document.documentElement.scrollHeight).toString()
+        );
+      }
+      if (document.readyState === 'complete') {
+        sendHeight();
+      } else {
+        window.addEventListener('load', sendHeight);
+      }
+      setTimeout(sendHeight, 600);
+    })();
+    true;
+  `;
 
   // Track keyboard visibility for input safe areas
   useEffect(() => {
@@ -97,7 +128,7 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
             comments: [...prevTask.comments, data.comment],
           };
         });
-        
+
         // Auto scroll chat to bottom
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -130,7 +161,7 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
       const payload = { [field]: val };
       const response = await api.put(`/api/tasks/${id}`, payload);
       setTask((prev) => ({ ...prev, ...response.data }));
-      
+
       // Refresh to pull updated status histories / comments
       await fetchTaskDetails();
     } catch (error) {
@@ -147,7 +178,7 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
     try {
       // Outgoing payload automatically encrypted
       const response = await api.post(`/api/tasks/${id}/comments`, { content: newComment.trim() });
-      
+
       // Append manually if socket didn't broadcast to us directly (or backup)
       setTask((prev) => {
         if (!prev) return null;
@@ -252,9 +283,28 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
           {/* Email Body Block */}
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeader}>Inquiry Email Description</Text>
-            <View style={styles.emailBodyCard}>
-              <Text style={styles.emailBodyText}>{task.description}</Text>
-            </View>
+            {task.description && (
+              task.description.trim().startsWith('<html') ||
+              task.description.trim().startsWith('<!DOCTYPE') ||
+              /<\/?[a-z][\s\S]*>/i.test(task.description)
+            ) ? (
+              <View style={[styles.emailBodyCardHtml, { height: webViewHeight }]}>
+                <WebView
+                  originWhitelist={['*']}
+                  source={{ html: task.description }}
+                  style={styles.webView}
+                  injectedJavaScript={injectedJavaScript}
+                  onMessage={onWebViewMessage}
+                  scrollEnabled={false}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                />
+              </View>
+            ) : (
+              <View style={styles.emailBodyCard}>
+                <Text style={styles.emailBodyText}>{task.description}</Text>
+              </View>
+            )}
           </View>
 
           {/* AI Extracted Items */}
@@ -317,10 +367,10 @@ const InquiryDetailsScreen = ({ route, navigation }) => {
         {/* Real-time comment input box */}
         <View style={[
           styles.inputContainer,
-          { 
-            paddingBottom: isKeyboardVisible 
-              ? 12 
-              : Math.max(insets.bottom, 16) + 12 
+          {
+            paddingBottom: isKeyboardVisible
+              ? 12
+              : Math.max(insets.bottom, 16) + 12
           }
         ]}>
           <TextInput
@@ -523,10 +573,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
   },
+  emailBodyCardHtml: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    overflow: 'hidden',
+  },
   emailBodyText: {
     fontSize: 13,
     color: COLORS.textDark,
     lineHeight: 20,
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   productsCard: {
     backgroundColor: COLORS.white,

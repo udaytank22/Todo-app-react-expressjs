@@ -11,6 +11,7 @@ import {
   TextInput,
   SafeAreaView,
   Alert,
+  ScrollView,
 } from 'react-native';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';

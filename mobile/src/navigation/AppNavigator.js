@@ -18,25 +18,69 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import CustomerAssignmentsScreen from '../screens/CustomerAssignmentsScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import DirectChatScreen from '../screens/DirectChatScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Custom Unicode tab icons helper
-const getTabIcon = (routeName) => {
+// Custom vector shapes for tab icons (matching the designs in the image)
+const renderCustomIcon = (routeName, color) => {
   switch (routeName) {
     case 'Dashboard':
-      return '📊';
+      return (
+        <View style={styles.gridIcon}>
+          <View style={[styles.gridSquare, { borderColor: color }]} />
+          <View style={[styles.gridSquare, { borderColor: color }]} />
+          <View style={[styles.gridSquare, { borderColor: color }]} />
+          <View style={[styles.gridSquare, { borderColor: color }]} />
+        </View>
+      );
     case 'Kanban':
-      return '📋';
-    case 'Tasks List':
-      return '📝';
-    case 'Notifications':
-      return '🔔';
-    case 'Assignments':
-      return '👥';
+      return (
+        <View style={styles.kanbanIconContainer}>
+          <View style={[styles.kanbanIcon, { borderColor: color }]}>
+            <View style={[styles.kanbanClip, { backgroundColor: color }]} />
+            <View style={[styles.kanbanLine, { backgroundColor: color, width: 10 }]} />
+            <View style={[styles.kanbanLine, { backgroundColor: color, width: 8 }]} />
+            <View style={[styles.kanbanLine, { backgroundColor: color, width: 6 }]} />
+          </View>
+        </View>
+      );
+    case 'Tasks':
+      return (
+        <View style={styles.tasksIcon}>
+          <View style={styles.tasksRow}>
+            <View style={[styles.tasksBullet, { backgroundColor: color }]} />
+            <View style={[styles.tasksLine, { backgroundColor: color }]} />
+          </View>
+          <View style={styles.tasksRow}>
+            <View style={[styles.tasksBullet, { backgroundColor: color }]} />
+            <View style={[styles.tasksLine, { backgroundColor: color }]} />
+          </View>
+          <View style={styles.tasksRow}>
+            <View style={[styles.tasksBullet, { backgroundColor: color }]} />
+            <View style={[styles.tasksLine, { backgroundColor: color }]} />
+          </View>
+        </View>
+      );
+    case 'Alerts':
+      return (
+        <View style={styles.bellIcon}>
+          <View style={[styles.bellCap, { backgroundColor: color }]} />
+          <View style={[styles.bellBody, { borderColor: color }]} />
+          <View style={[styles.bellBase, { backgroundColor: color }]} />
+          <View style={[styles.bellClapper, { backgroundColor: color }]} />
+        </View>
+      );
+    case 'Profile':
+      return (
+        <View style={[styles.profileIcon, { borderColor: color }]}>
+          <View style={[styles.profileHead, { borderColor: color }]} />
+          <View style={[styles.profileShoulders, { borderColor: color }]} />
+        </View>
+      );
     default:
-      return '🔹';
+      return null;
   }
 };
 
@@ -68,14 +112,24 @@ const TabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
-        tabBarIcon: ({ focused }) => {
-          const icon = getTabIcon(route.name);
+        tabBarIcon: ({ focused, color }) => {
           return (
-            <View style={[styles.tabIconContainer, focused && styles.tabIconActive]}>
-              <Text style={[styles.tabIcon, { opacity: focused ? 1 : 0.6 }]}>
-                {icon}
-              </Text>
+            <View style={styles.tabIconWrapper}>
+              {focused && <View style={styles.activeDot} />}
+              <View style={styles.tabIconContainer}>
+                {renderCustomIcon(route.name, color)}
+              </View>
             </View>
+          );
+        },
+        tabBarLabel: ({ focused, color }) => {
+          return (
+            <Text style={[
+              styles.tabLabelText, 
+              { color: color, fontWeight: focused ? 'bold' : 'normal' }
+            ]}>
+              {route.name}
+            </Text>
           );
         },
         tabBarActiveTintColor: COLORS.primary,
@@ -86,10 +140,10 @@ const TabNavigator = () => {
           borderTopColor: COLORS.border,
           height: Platform.OS === 'ios'
             ? 60 + insets.bottom
-            : 60 + (insets.bottom > 0 ? insets.bottom : 12),
+            : 65 + (insets.bottom > 0 ? insets.bottom : 0),
           paddingBottom: Platform.OS === 'ios'
-            ? 8 + insets.bottom
-            : 8 + (insets.bottom > 0 ? insets.bottom : 8),
+            ? 6 + insets.bottom
+            : 10,
           paddingTop: 8,
           elevation: 8,
           shadowColor: '#000',
@@ -97,6 +151,7 @@ const TabNavigator = () => {
           shadowOpacity: 0.05,
           shadowRadius: 5,
         },
+        headerTitleAlign: 'left',
         headerStyle: {
           backgroundColor: COLORS.white,
           elevation: 2,
@@ -107,23 +162,10 @@ const TabNavigator = () => {
         },
         headerTitleStyle: {
           fontWeight: 'bold',
+          fontSize: 20,
           color: COLORS.textDark,
+          marginLeft: 8,
         },
-        headerLeft: () => (
-          <TouchableOpacity 
-            style={styles.headerLeftContainer} 
-            activeOpacity={0.8}
-            onPress={handleAvatarPress}
-          >
-            <View style={styles.headerAvatar}>
-              <Text style={styles.headerAvatarText}>{getInitials(user?.name)}</Text>
-            </View>
-            <View style={[
-              styles.statusIndicator, 
-              { backgroundColor: isMailConnected ? COLORS.success : COLORS.danger }
-            ]} />
-          </TouchableOpacity>
-        ),
         headerRight: () => (
           <TouchableOpacity 
             style={styles.headerRightContainer} 
@@ -144,9 +186,9 @@ const TabNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Kanban" component={KanbanScreen} />
-      <Tab.Screen name="Tasks List" component={ListScreen} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} />
-      <Tab.Screen name="Assignments" component={CustomerAssignmentsScreen} />
+      <Tab.Screen name="Tasks" component={ListScreen} />
+      <Tab.Screen name="Alerts" component={NotificationsScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };
@@ -219,6 +261,14 @@ const AppNavigator = () => {
                 headerBackTitleVisible: false,
               })}
             />
+            <Stack.Screen 
+              name="CustomerAssignments" 
+              component={CustomerAssignmentsScreen} 
+              options={{ 
+                title: 'Customer Assignments',
+                headerBackTitleVisible: false,
+              }}
+            />
           </>
         )}
       </Stack.Navigator>
@@ -233,18 +283,154 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
+  tabIconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  activeDot: {
+    position: 'absolute',
+    top: -12,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: COLORS.primary,
+  },
   tabIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: 40,
-    height: 40,
-    borderRadius: 20,
+    height: 30,
   },
-  tabIconActive: {
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+  tabLabelText: {
+    fontSize: 10,
+    marginTop: 0,
+    textAlign: 'center',
   },
-  tabIcon: {
-    fontSize: 20,
+  // Custom drawn CSS outline icons
+  gridIcon: {
+    width: 20,
+    height: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
+  },
+  gridSquare: {
+    width: 8,
+    height: 8,
+    borderWidth: 2,
+    borderRadius: 2.5,
+  },
+  kanbanIconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kanbanIcon: {
+    width: 16,
+    height: 19,
+    borderWidth: 2,
+    borderRadius: 3.5,
+    paddingTop: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1.5,
+    position: 'relative',
+  },
+  kanbanClip: {
+    width: 6,
+    height: 2.5,
+    borderBottomLeftRadius: 1.5,
+    borderBottomRightRadius: 1.5,
+    position: 'absolute',
+    top: 0,
+  },
+  kanbanLine: {
+    height: 2,
+    borderRadius: 1,
+  },
+  tasksIcon: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    gap: 3.5,
+  },
+  tasksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tasksBullet: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  tasksLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 1,
+  },
+  bellIcon: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellCap: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: -1,
+  },
+  bellBody: {
+    width: 14,
+    height: 10,
+    borderWidth: 2,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomWidth: 0,
+  },
+  bellBase: {
+    width: 18,
+    height: 2,
+    borderRadius: 1,
+  },
+  bellClapper: {
+    width: 4,
+    height: 3,
+    borderBottomLeftRadius: 1.5,
+    borderBottomRightRadius: 1.5,
+    marginTop: 1,
+  },
+  profileIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profileHead: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    borderWidth: 2,
+    marginTop: 2,
+  },
+  profileShoulders: {
+    width: 14,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 2,
+    position: 'absolute',
+    bottom: -4,
   },
   headerLeftContainer: {
     marginLeft: 16,

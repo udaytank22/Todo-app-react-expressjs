@@ -1,68 +1,68 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["fullTextSearch"]
 }
 
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 model User {
-  id                  String               @id @default(uuid())
-  email               String               @unique
-  password            String
-  name                String
-  role                String               // "ADMIN", "MANAGER", "STAFF"
-  tasksAssigned       Task[]               @relation("TaskAssignee")
-  comments            Comment[]
-  statusLogs          StatusHistory[]
-  notifications       Notification[]       @relation("UserNotifications")
+  id                   String                @id @default(uuid())
+  email                String                @unique
+  password             String
+  name                 String
+  role                 String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  comments             Comment[]
+  customerAssignments  CustomerAssignment[]  @relation("CustomerAssignmentUser")
+  receivedMessages     DirectMessage[]       @relation("ReceivedMessages")
+  sentMessages         DirectMessage[]       @relation("SentMessages")
+  notifications        Notification[]        @relation("UserNotifications")
   archiveNotifications NotificationArchive[] @relation("UserArchiveNotifications")
-  customerAssignments CustomerAssignment[] @relation("CustomerAssignmentUser")
-  sentMessages        DirectMessage[]      @relation("SentMessages")
-  receivedMessages    DirectMessage[]      @relation("ReceivedMessages")
-  refreshTokens       RefreshToken[]       @relation("UserRefreshTokens")
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  refreshTokens        RefreshToken[]        @relation("UserRefreshTokens")
+  statusLogs           StatusHistory[]
+  tasksAssigned        Task[]                @relation("TaskAssignee")
 }
 
 model Email {
-  id              String        @id @default(uuid())
-  messageId       String        @unique  // Microsoft Graph message ID to prevent duplicates
+  id              String   @id @default(uuid())
+  messageId       String   @unique
   subject         String
   senderEmail     String
   senderName      String
-  body            String        @db.Text
+  body            String
   receivedAt      DateTime
-  processedStatus String        // "PENDING", "PROCESSED", "FAILED"
-  createdAt       DateTime      @default(now())
+  processedStatus String
+  createdAt       DateTime @default(now())
   task            Task?
 }
 
 model Task {
-  id              String          @id @default(uuid())
-  inquiryId       String          @unique  // Custom counter e.g., "INQ-1001"
-  subject         String
-  customerName    String
-  senderEmail     String
-  description     String          @db.Text
-  status          String          // "PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"
-  priority        String          // "LOW", "MEDIUM", "HIGH", "URGENT"
-  dueDate         DateTime?
-  externalLink    String?
-  remarks         String?         @db.Text
-  aiSummary       String?         @db.Text
-  assignedUserId  String?
-  assignedUser    User?           @relation("TaskAssignee", fields: [assignedUserId], references: [id])
-  emailId         String?         @unique
-  email           Email?          @relation(fields: [emailId], references: [id], onDelete: SetNull)
-  attachments     Attachment[]
-  comments        Comment[]
-  statusHistory   StatusHistory[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  search_vector   Unsupported("tsvector")? @default(dbgenerated())
+  id             String                   @id @default(uuid())
+  inquiryId      String                   @unique
+  subject        String
+  customerName   String
+  senderEmail    String
+  description    String
+  status         String
+  priority       String
+  dueDate        DateTime?
+  externalLink   String?
+  remarks        String?
+  aiSummary      String?
+  assignedUserId String?
+  emailId        String?                  @unique
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  search_vector  Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(description, ''::text)) || ' '::text) || COALESCE(\"customerName\", ''::text)) || ' '::text) || COALESCE(\"senderEmail\", ''::text)) || ' '::text) || COALESCE(\"inquiryId\", ''::text)))"))
+  attachments    Attachment[]
+  comments       Comment[]
+  statusHistory  StatusHistory[]
+  assignedUser   User?                    @relation("TaskAssignee", fields: [assignedUserId], references: [id])
+  email          Email?                   @relation(fields: [emailId], references: [id])
 
   @@index([status])
   @@index([priority])
@@ -73,24 +73,24 @@ model Task {
 model Attachment {
   id        String   @id @default(uuid())
   filename  String
-  filePath  String   // Local storage path
-  fileType  String   // "PDF", "EXCEL", "OTHER"
+  filePath  String
+  fileType  String
   fileSize  Int
   taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
 }
 
 model Comment {
   id        String   @id @default(uuid())
-  content   String   @db.Text
+  content   String
   taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([userId])
@@ -99,12 +99,12 @@ model Comment {
 model StatusHistory {
   id          String   @id @default(uuid())
   taskId      String
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   fromStatus  String
   toStatus    String
   changedById String?
-  changedBy   User?    @relation(fields: [changedById], references: [id], onDelete: SetNull)
   changedAt   DateTime @default(now())
+  changedBy   User?    @relation(fields: [changedById], references: [id])
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
 }
@@ -112,10 +112,10 @@ model StatusHistory {
 model AiLog {
   id             String   @id @default(uuid())
   emailMessageId String
-  prompt         String   @db.Text
-  rawResponse    String   @db.Text
-  status         String   // "SUCCESS", "FAILURE"
-  errorMsg       String?  @db.Text
+  prompt         String
+  rawResponse    String
+  status         String
+  errorMsg       String?
   createdAt      DateTime @default(now())
 
   @@index([emailMessageId])
@@ -124,29 +124,29 @@ model AiLog {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  user      User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  type      String   // "NEW_INQUIRY", "NEW_COMMENT", "ASSIGNMENT", "STATUS_UPDATE"
+  type      String
   title     String
   message   String
-  relatedId String   // The task/inquiry ID
+  relatedId String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  user      User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isRead])
 }
 
 model NotificationArchive {
-  id        String   @id
-  userId    String
-  user      User     @relation("UserArchiveNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  type      String   // "NEW_INQUIRY", "NEW_COMMENT", "ASSIGNMENT", "STATUS_UPDATE"
-  title     String
-  message   String
-  relatedId String   // The task/inquiry ID
-  isRead    Boolean  @default(false)
-  createdAt DateTime
+  id         String   @id
+  userId     String
+  type       String
+  title      String
+  message    String
+  relatedId  String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime
   archivedAt DateTime @default(now())
+  user       User     @relation("UserArchiveNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -158,21 +158,21 @@ model Counter {
 }
 
 model CustomerAssignment {
-  id              String   @id @default(uuid())
-  customerName    String?
-  customerEmail   String?
-  assignedUserId  String
-  assignedUser    User     @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  customerName   String?
+  customerEmail  String?
+  assignedUserId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  assignedUser   User     @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
 
   @@unique([customerName, customerEmail])
 }
 
 model IntegrationToken {
   provider     String   @id
-  accessToken  String   @db.Text
-  refreshToken String?  @db.Text
+  accessToken  String
+  refreshToken String?
   expiryTime   BigInt?
   updatedAt    DateTime @updatedAt
 }
@@ -180,11 +180,11 @@ model IntegrationToken {
 model DirectMessage {
   id         String   @id @default(uuid())
   senderId   String
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiverId String
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  content    String   @db.Text
+  content    String
   createdAt  DateTime @default(now())
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([senderId])
   @@index([receiverId])
@@ -194,9 +194,9 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
   userId    String
-  user      User     @relation("UserRefreshTokens", fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation("UserRefreshTokens", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

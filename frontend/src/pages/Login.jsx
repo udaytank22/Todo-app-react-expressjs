@@ -151,7 +151,7 @@ const Login = () => {
  </form>
 
  {/* Footnote Tab Switcher */}
- {/* <div className="mt-8 pt-6 border-t border-black/5 text-center text-xs">
+ <div className="mt-8 pt-6 border-t border-black/5 text-center text-xs">
  <p className="text-slate-600">
  {isLogin ? "Don't have an account yet?" : 'Already registered?'}
  <button
@@ -165,7 +165,7 @@ const Login = () => {
  {isLogin ? 'Create one now' : 'Sign in here'}
  </button>
  </p>
- </div> */}
+ </div>
  </div>
  </div>
  );
