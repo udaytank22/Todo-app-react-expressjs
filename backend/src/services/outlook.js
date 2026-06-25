@@ -22,7 +22,7 @@ const loadConfig = async () => {
     const tokenRecord = await prisma.integrationToken.findUnique({
       where: { provider: 'outlook' }
     });
-    
+
     if (tokenRecord) {
       oauthConfig = {
         accessToken: tokenRecord.accessToken,
@@ -42,7 +42,7 @@ const loadConfig = async () => {
  */
 const saveConfig = async (config) => {
   oauthConfig = { ...oauthConfig, ...config };
-  
+
   try {
     const expiryTimeBigInt = oauthConfig.expiryTime ? BigInt(oauthConfig.expiryTime) : null;
     await prisma.integrationToken.upsert({

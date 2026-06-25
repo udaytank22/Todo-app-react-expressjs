@@ -17,7 +17,17 @@ async function cleanDb() {
     console.log('Deleting Notifications...');
     await prisma.notification.deleteMany({});
     
-    // Deleting Customer Assignments is removed to preserve Master Auto-Assignment Rules
+    console.log('Deleting Notification Archives...');
+    await prisma.notificationArchive.deleteMany({});
+    
+    console.log('Deleting Customer Assignments...');
+    await prisma.customerAssignment.deleteMany({});
+    
+    console.log('Deleting Direct Messages...');
+    await prisma.directMessage.deleteMany({});
+    
+    console.log('Deleting Refresh Tokens...');
+    await prisma.refreshToken.deleteMany({});
     
     // Delete Tasks (depends on Emails and Users)
     console.log('Deleting Tasks...');
@@ -32,6 +42,9 @@ async function cleanDb() {
     
     console.log('Deleting Counters...');
     await prisma.counter.deleteMany({});
+    
+    console.log('Deleting Integration Tokens...');
+    await prisma.integrationToken.deleteMany({});
     
     console.log('Database cleaned successfully!');
   } catch (error) {

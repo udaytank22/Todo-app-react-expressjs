@@ -111,14 +111,15 @@ const startServer = async () => {
     message: { error: 'Too many requests. Please try again later.' },
   });
 
-  const authLimiter = buildRateLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyPrefix: 'rl:auth:',      // Only used by RedisStore prefix
-    message: { error: 'Too many login attempts. Please try again later.' },
-  });
+  // const authLimiter = buildRateLimiter({
+  //   windowMs: 15 * 60 * 1000,
+  //   max: 20,
+  //   standardHeaders: true,
+  //   legacyHeaders: false,
+  //   keyPrefix: 'rl:auth:',      // Only used by RedisStore prefix
+  //   message: { error: 'Too many login attempts. Please try again later.' },
+  // });
+  const authLimiter = (req, res, next) => next();
 
   app.use('/api/', apiLimiter);
   app.use('/api/auth/login', authLimiter);
