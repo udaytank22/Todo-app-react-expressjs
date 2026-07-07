@@ -22,6 +22,9 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const customerAssignmentRoutes = require('./routes/customerAssignmentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const groupRoutes = require('./routes/groupRoutes');
+const teamRoutes = require('./routes/teamRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const { prometheus, metricsMiddleware, checkHealth } = require('./utils/monitoring');
 const logger = require('./utils/logger');
 const encryptionMiddleware = require('./middleware/encryption');
@@ -140,6 +143,9 @@ const startServer = async () => {
   app.use('/api/customer-assignments', customerAssignmentRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/search', searchRoutes);
+  app.use('/api/groups', groupRoutes);
+  app.use('/api/teams', teamRoutes);
+  app.use('/api/reports', reportRoutes);
 
   // --- Observability Endpoints ---
   app.get('/health', async (req, res) => {

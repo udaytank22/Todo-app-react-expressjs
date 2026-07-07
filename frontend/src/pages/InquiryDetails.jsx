@@ -8,6 +8,7 @@ import Dropdown from '../components/ui/Dropdown';
 import Modal from '../components/ui/Modal';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateTask, addComment } from '../store/tasksSlice';
+import { fetchGroups } from '../store/groupsSlice';
 import { useAuth } from '../context/AuthContext';
 import {
     ArrowLeft,
@@ -35,9 +36,11 @@ const InquiryDetails = () => {
 
     const tasks = useSelector(state => state.tasks.tasks);
     const storeTask = tasks.find(t => t.id === id);
+    const groups = useSelector(state => state.groups.groups);
 
     const [task, setTask] = useState(null);
     const [users, setUsers] = useState([]);
+    const [teams, setTeams] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'pdf' | 'excel'
 
@@ -59,7 +62,7 @@ const InquiryDetails = () => {
         if (!task.assignedUserId) return;
         setIsCreatingRule(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             await axios.post('/api/assignments', {
                 customerName: task.customerName,
                 customerEmail: task.senderEmail,
@@ -78,7 +81,7 @@ const InquiryDetails = () => {
 
     const fetchTaskDetails = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             const response = await axios.get(`/api/tasks/${id}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
@@ -93,13 +96,26 @@ const InquiryDetails = () => {
 
     const fetchUsersList = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = sessionStorage.getItem('token');
             const response = await axios.get('/api/auth/users', {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             setUsers(response.data);
+            dispatch(fetchGroups());
         } catch (error) {
             console.error('Failed to load users:', error);
+        }
+    };
+
+    const fetchTeamsList = async () => {
+        try {
+            const token = sessionStorage.getItem('token');
+            const response = await axios.get('/api/teams', {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            setTeams(response.data);
+        } catch (error) {
+            console.error('Failed to load teams:', error);
         }
     };
 
@@ -145,7 +161,7 @@ const InquiryDetails = () => {
 
     useEffect(() => {
         const init = async () => {
-            await Promise.all([fetchTaskDetails(), fetchUsersList()]);
+            await Promise.all([fetchTaskDetails(), fetchUsersList(), fetchTeamsList()]);
             setIsLoading(false);
         };
         init();
@@ -385,7 +401,7 @@ const InquiryDetails = () => {
                                                     {Math.round(file.fileSize / 1024)} KB
                                                 </span>
                                                 <a
-                                                    href={`/api/tasks/attachments/${file.id}/view?token=${localStorage.getItem('token') || ''}`}
+                                                    href={`/api/tasks/attachments/${file.id}/view?token=${sessionStorage.getItem('token') || ''}`}
                                                     download={file.filename}
                                                     target="_blank"
                                                     rel="noreferrer"
@@ -511,7 +527,21 @@ const InquiryDetails = () => {
                                 />
                             </div>
 
-                            {/* User assignment control */}
+                            {/* Team assignment control */}
+                            <div>
+                                <Dropdown
+                                    label="Assigned Team"
+                                    value={task.teamId || ''}
+                                    onChange={(e) => handleMetadataChange('teamId', e.target.value)}
+                                    disabled={isUpdatingMetadata || user?.role === 'STAFF'}
+                                    options={[
+                                        { value: '', label: 'Unassigned' },
+                                        ...teams.map(t => ({ value: t.id, label: t.name }))
+                                    ]}
+                                />
+                            </div>
+
+                            {/* User assignment control (Commented out per request)
                             <Dropdown
                                 label="Assign Handler Staff"
                                 value={task.assignedUserId || ''}
@@ -531,11 +561,12 @@ const InquiryDetails = () => {
                                         className="text-[10px] flex items-center gap-1.5 text-sky-400 hover:text-sky-300 transition-colors font-semibold disabled:opacity-50"
                                         title="Always assign future emails from this sender to the selected staff"
                                     >
-                                        <User className="h-3 w-3" />
-                                        {isCreatingRule ? 'Saving...' : 'Set as Default Auto-Assignment'}
+                                        <Shield className="h-3 w-3" />
+                                        {isCreatingRule ? 'Setting Rule...' : 'Set as Default Handler'}
                                     </button>
                                 </div>
                             )}
+                            */}
 
 
 
@@ -598,7 +629,7 @@ const InquiryDetails = () => {
                                 Size: {Math.round(previewAttachment.fileSize / 1024)} KB | Type: {previewAttachment.fileType}
                             </span>
                             <a
-                                href={`/api/tasks/attachments/${previewAttachment.id}/view?token=${localStorage.getItem('token') || ''}`}
+                                href={`/api/tasks/attachments/${previewAttachment.id}/view?token=${sessionStorage.getItem('token') || ''}`}
                                 download={previewAttachment.filename}
                                 target="_blank"
                                 rel="noreferrer"
@@ -648,11 +679,11 @@ const InquiryDetails = () => {
                         <div className="w-full h-full overflow-hidden flex flex-col md:flex-row">
                             {/* Left Section: Headers & Attachments */}
                             <div className="w-full md:w-[350px] lg:w-[400px] border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50/50 flex flex-col h-auto md:h-full overflow-y-auto p-6 flex-shrink-0">
-                                <h1 className="text-lg font-bold text-slate-900 mb-6 leading-snug">{task.subject}</h1>
+                                <h1 className="text-base font-bold text-slate-900 mb-6 leading-snug">{task.subject}</h1>
 
                                 <div className="flex flex-col gap-4 mb-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-lg flex-shrink-0">
+                                        <div className="h-10 w-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-base flex-shrink-0">
                                             {task.customerName ? task.customerName.charAt(0).toUpperCase() : task.senderEmail?.charAt(0).toUpperCase()}
                                         </div>
                                         <div className="overflow-hidden">
@@ -678,7 +709,7 @@ const InquiryDetails = () => {
                                             {task.attachments.map((file) => (
                                                 <a
                                                     key={file.id}
-                                                    href={`/api/tasks/attachments/${file.id}/view?token=${localStorage.getItem('token') || ''}`}
+                                                    href={`/api/tasks/attachments/${file.id}/view?token=${sessionStorage.getItem('token') || ''}`}
                                                     download={file.filename}
                                                     target="_blank"
                                                     rel="noreferrer"

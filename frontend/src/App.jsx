@@ -19,6 +19,7 @@ const InquiryDetails = lazy(() => import('./pages/InquiryDetails'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const CustomerAssignments = lazy(() => import('./pages/CustomerAssignments'));
 const UnassignedNotes = lazy(() => import('./pages/UnassignedNotes'));
+const Groups = lazy(() => import('./pages/Groups'));
 import { useDispatch } from 'react-redux';
 import { fetchTasks, addInquiryLocal, updateStatusLocal, updateTaskLocal, removeTaskLocal, addCommentLocal } from './store/tasksSlice';
 import { fetchNotifications, addNotificationLocal } from './store/notificationsSlice';
@@ -148,6 +149,23 @@ const AppContent = () => {
         newSocket.on('new_notification', (notification) => {
             console.log('[Socket] New notification received:', notification);
             dispatch(addNotificationLocal(notification));
+
+            // Push toast alert
+            const id = Date.now();
+            setToasts((prev) => [
+                ...prev,
+                {
+                    id,
+                    type: 'notification',
+                    title: notification.title || 'New Notification',
+                    message: notification.message,
+                    dbId: notification.relatedId || notification.id
+                }
+            ]);
+
+            setTimeout(() => {
+                setToasts((prev) => prev.filter(t => t.id !== id));
+            }, 6000);
         });
 
         // Listen for new inquiries processed
@@ -342,6 +360,7 @@ const AppContent = () => {
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/kanban" element={<Kanban socket={socket} searchVal={searchVal} />} />
                         <Route path="/list" element={<List socket={socket} searchVal={searchVal} />} />
+                        <Route path="/groups" element={<Groups />} />
                         <Route path="/inquiry/:id" element={<InquiryDetails />} />
                         <Route path="/notifications" element={<Notifications />} />
                         <Route path="/assignments" element={<CustomerAssignments />} />
@@ -467,6 +486,54 @@ const AppContent = () => {
                                             <span>&rarr;</span>
                                         </a>
                                     </div>
+                                </div>
+
+                                <button
+                                    onClick={() => removeToast(toast.id)}
+                                    className="text-slate-500 hover:text-slate-700 self-start p-1 transition-colors"
+                                    aria-label="Close toast alert"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        );
+                    }
+
+                    if (toast.type === 'notification') {
+                        return (
+                            <div
+                                key={toast.id}
+                                className="glass-panel p-4 rounded-2xl flex gap-3 border-emerald-500/20 shadow-2xl animate-slideIn hover:border-emerald-500/35 transition-all group"
+                            >
+                                <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-400 border border-emerald-500/25 flex items-center justify-center self-start">
+                                    <Bell className="h-4 w-4 animate-pulse" />
+                                </div>
+
+                                <div className="flex-1 overflow-hidden space-y-1">
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-extrabold text-emerald-400 font-sans tracking-wide">
+                                            NOTIFICATION
+                                        </span>
+                                        <span className="text-emerald-400 font-bold tracking-wider uppercase truncate max-w-[150px]">
+                                            {toast.title}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-600 truncate leading-relaxed">
+                                        {toast.message}
+                                    </p>
+
+                                    {toast.dbId && (
+                                        <div className="pt-1.5 flex justify-end">
+                                            <a
+                                                href={`/inquiry/${toast.dbId}`}
+                                                className="text-[10px] font-extrabold text-emerald-400 hover:text-emerald-300 uppercase tracking-widest flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform"
+                                                onClick={() => removeToast(toast.id)}
+                                            >
+                                                <span>View details</span>
+                                                <span>&rarr;</span>
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button

@@ -164,6 +164,7 @@ const getAllUsers = async (req, res) => {
         email: true,
         name: true,
         role: true,
+        teams: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -260,6 +261,209 @@ const logout = async (req, res) => {
   }
 };
 
+/**
+ * Admin: Create a new user
+ */
+const createUser = async (req, res) => {
+  const { email, password, name, role, teamIds } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'All fields (email, password, name) are required.' });
+  }
+
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+    return res.status(403).json({ error: 'Forbidden. Admin or Manager role required.' });
+  }
+
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'A user with this email already exists.' });
+    }
+
+    let assignedRole = (role || 'STAFF').toUpperCase();
+    if (!['ADMIN', 'MANAGER', 'STAFF'].includes(assignedRole)) {
+      assignedRole = 'STAFF';
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = await prisma.user.create({
+      data: {
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        name,
+        role: assignedRole,
+        teams: teamIds ? { connect: teamIds.map(id => ({ id })) } : undefined,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        teams: true,
+      },
+    });
+
+    return res.status(201).json(newUser);
+  } catch (error) {
+    console.error('Create user error:', error);
+    return res.status(500).json({ error: 'Server error creating user.' });
+  }
+};
+
+/**
+ * Admin: Update a user
+ */
+const updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { email, password, name, role, teamIds } = req.body;
+
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+    return res.status(403).json({ error: 'Forbidden. Admin or Manager role required.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    
+    if (email && email.toLowerCase() !== user.email) {
+      const existingEmail = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      if (existingEmail) {
+        return res.status(400).json({ error: 'Email is already in use.' });
+      }
+      updateData.email = email.toLowerCase();
+    }
+
+    if (role) {
+      const newRole = role.toUpperCase();
+      if (['ADMIN', 'MANAGER', 'STAFF'].includes(newRole)) {
+        updateData.role = newRole;
+      }
+    }
+
+    if (teamIds) {
+      updateData.teams = { set: teamIds.map(id => ({ id })) };
+    }
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        teams: true,
+      },
+    });
+
+    return res.json(updatedUser);
+  } catch (error) {
+    console.error('Update user error:', error);
+    return res.status(500).json({ error: 'Server error updating user.' });
+  }
+};
+
+/**
+ * Admin: Delete a user
+ */
+const deleteUser = async (req, res) => {
+  const { id } = req.params;
+
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'MANAGER') {
+    return res.status(403).json({ error: 'Forbidden. Admin or Manager role required.' });
+  }
+
+  // Prevent deleting oneself
+  if (id === req.user.id) {
+    return res.status(400).json({ error: 'You cannot delete your own account.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    await prisma.user.delete({ where: { id } });
+
+    return res.json({ message: 'User deleted successfully.' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return res.status(500).json({ error: 'Server error deleting user.' });
+  }
+};
+
+/**
+ * Import users in bulk (Admin only)
+ */
+const createUsersBulk = async (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden. Admin role required.' });
+  }
+
+  const { users } = req.body;
+  if (!Array.isArray(users)) {
+    return res.status(400).json({ error: 'Invalid data format. Expected an array of users.' });
+  }
+
+  try {
+    const results = { imported: 0, errors: [] };
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('Welcome123!', salt);
+
+    for (const [index, u] of users.entries()) {
+      const email = u.email?.trim().toLowerCase();
+      const name = u.name?.trim();
+      let role = u.role?.trim().toUpperCase() || 'STAFF';
+      if (!['ADMIN', 'MANAGER', 'STAFF'].includes(role)) role = 'STAFF';
+
+      if (!email || !name) {
+        results.errors.push(`Row ${index + 1}: Missing email or name.`);
+        continue;
+      }
+
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        results.errors.push(`Row ${index + 1}: User with email ${email} already exists.`);
+        continue;
+      }
+
+      await prisma.user.create({
+        data: {
+          email,
+          name,
+          role,
+          password: hashedPassword,
+        }
+      });
+      results.imported++;
+    }
+
+    return res.status(200).json({ message: `Imported ${results.imported} users.`, results });
+  } catch (error) {
+    console.error('Bulk user import error:', error);
+    return res.status(500).json({ error: 'Server error during bulk import.' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -267,4 +471,8 @@ module.exports = {
   getAllUsers,
   refresh,
   logout,
+  createUser,
+  updateUser,
+  deleteUser,
+  createUsersBulk,
 };

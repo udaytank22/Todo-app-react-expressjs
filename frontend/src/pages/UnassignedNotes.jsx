@@ -81,7 +81,7 @@ const UnassignedNotes = () => {
                 ) : tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                         <Inbox className="h-16 w-16 mb-4 opacity-20" />
-                        <h3 className="text-lg font-bold text-slate-500">No unassigned inquiries</h3>
+                        <h3 className="text-base font-bold text-slate-500">No unassigned inquiries</h3>
                         <p className="text-sm mt-1">There are no unassigned inquiries for {new Date(selectedDate).toLocaleDateString()}.</p>
                     </div>
                 ) : (

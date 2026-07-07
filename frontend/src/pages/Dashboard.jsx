@@ -248,7 +248,7 @@ const Dashboard = () => {
                 <span>Assigned inquiries</span>
               </span>
               <span className="font-bold text-slate-800">
-                {tasks.filter(t => t.assignedUserId).length} / {totalInquiries}
+                {tasks.filter(t => t.assignedUserId || t.groupId).length} / {totalInquiries}
               </span>
             </div>
           </Card>

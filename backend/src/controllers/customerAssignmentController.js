@@ -16,6 +16,7 @@ const getAllRules = async (req, res) => {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
         },
+        team: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -32,24 +33,35 @@ const getAllRules = async (req, res) => {
  * Create a new auto-assignment rule
  */
 const createRule = async (req, res) => {
-  const { customerName, customerEmail, assignedUserId } = req.body;
+  const { customerName, customerEmail, assignedUserId, teamId } = req.body;
 
   if (!customerName && !customerEmail) {
     return res.status(400).json({ error: 'Either Customer Name or Customer Email must be specified.' });
   }
 
-  if (!assignedUserId) {
-    return res.status(400).json({ error: 'An assignee (employee) must be selected.' });
+  if (!assignedUserId && !teamId) {
+    return res.status(400).json({ error: 'An assignee (employee or team) must be selected.' });
   }
 
   try {
-    // Verify target employee exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: assignedUserId },
-    });
+    // Verify target employee exists if provided
+    if (assignedUserId) {
+      const userExists = await prisma.user.findUnique({
+        where: { id: assignedUserId },
+      });
+      if (!userExists) {
+        return res.status(404).json({ error: 'Assigned employee not found.' });
+      }
+    }
 
-    if (!userExists) {
-      return res.status(404).json({ error: 'Assigned employee not found.' });
+    // Verify target team exists if provided
+    if (teamId) {
+      const teamExists = await prisma.team.findUnique({
+        where: { id: teamId },
+      });
+      if (!teamExists) {
+        return res.status(404).json({ error: 'Assigned team not found.' });
+      }
     }
 
     const emailPattern = customerEmail ? customerEmail.trim().toLowerCase() : null;
@@ -71,12 +83,14 @@ const createRule = async (req, res) => {
       data: {
         customerName: namePattern,
         customerEmail: emailPattern,
-        assignedUserId,
+        assignedUserId: assignedUserId || null,
+        teamId: teamId || null,
       },
       include: {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
         },
+        team: true,
       },
     });
 
@@ -92,7 +106,10 @@ const createRule = async (req, res) => {
       try {
         await prisma.task.updateMany({
           where: updateWhere,
-          data: { assignedUserId },
+          data: { 
+            assignedUserId: assignedUserId || null,
+            teamId: teamId || null
+          },
         });
       } catch (err) {
         console.error('Failed to update old tasks with new rule:', err);
@@ -139,23 +156,33 @@ const deleteRule = async (req, res) => {
  */
 const updateRule = async (req, res) => {
   const { id } = req.params;
-  const { customerName, customerEmail, assignedUserId } = req.body;
+  const { customerName, customerEmail, assignedUserId, teamId } = req.body;
 
   if (!customerName && !customerEmail) {
     return res.status(400).json({ error: 'Either Customer Name or Customer Email must be specified.' });
   }
 
-  if (!assignedUserId) {
-    return res.status(400).json({ error: 'An assignee (employee) must be selected.' });
+  if (!assignedUserId && !teamId) {
+    return res.status(400).json({ error: 'An assignee (employee or team) must be selected.' });
   }
 
   try {
-    const userExists = await prisma.user.findUnique({
-      where: { id: assignedUserId },
-    });
-
-    if (!userExists) {
-      return res.status(404).json({ error: 'Assigned employee not found.' });
+    if (assignedUserId) {
+      const userExists = await prisma.user.findUnique({
+        where: { id: assignedUserId },
+      });
+      if (!userExists) {
+        return res.status(404).json({ error: 'Assigned employee not found.' });
+      }
+    }
+    
+    if (teamId) {
+      const teamExists = await prisma.team.findUnique({
+        where: { id: teamId },
+      });
+      if (!teamExists) {
+        return res.status(404).json({ error: 'Assigned team not found.' });
+      }
     }
 
     const emailPattern = customerEmail ? customerEmail.trim().toLowerCase() : null;
@@ -178,12 +205,14 @@ const updateRule = async (req, res) => {
       data: {
         customerName: namePattern,
         customerEmail: emailPattern,
-        assignedUserId,
+        assignedUserId: assignedUserId || null,
+        teamId: teamId || null,
       },
       include: {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
         },
+        team: true,
       },
     });
 
@@ -198,7 +227,10 @@ const updateRule = async (req, res) => {
       try {
         await prisma.task.updateMany({
           where: updateWhere,
-          data: { assignedUserId },
+          data: { 
+            assignedUserId: assignedUserId || null,
+            teamId: teamId || null
+          },
         });
       } catch (err) {
         console.error('Failed to update old tasks with new rule:', err);
@@ -213,9 +245,66 @@ const updateRule = async (req, res) => {
   }
 };
 
+/**
+ * Import auto-assignment rules in bulk
+ */
+const createRulesBulk = async (req, res) => {
+  const { rules } = req.body;
+  if (!Array.isArray(rules)) {
+    return res.status(400).json({ error: 'Invalid data format. Expected an array of rules.' });
+  }
+
+  try {
+    const results = { imported: 0, errors: [] };
+
+    for (const [index, r] of rules.entries()) {
+      const emailPattern = r.customerEmail?.trim().toLowerCase() || null;
+      const namePattern = r.customerName?.trim() || null;
+      const assignedUserId = r.assignedUserId;
+      const teamId = r.teamId;
+
+      if (!namePattern && !emailPattern) {
+        results.errors.push(`Row ${index + 1}: Either Customer Name or Email is required.`);
+        continue;
+      }
+
+      if (!assignedUserId && !teamId) {
+        results.errors.push(`Row ${index + 1}: Missing assigned user or team ID.`);
+        continue;
+      }
+
+      const existingRule = await prisma.customerAssignment.findFirst({
+        where: { customerName: namePattern, customerEmail: emailPattern },
+      });
+
+      if (existingRule) {
+        results.errors.push(`Row ${index + 1}: Rule already exists.`);
+        continue;
+      }
+
+      await prisma.customerAssignment.create({
+        data: {
+          customerName: namePattern,
+          customerEmail: emailPattern,
+          assignedUserId: assignedUserId || null,
+          teamId: teamId || null,
+        }
+      });
+      results.imported++;
+    }
+
+    await cache.invalidate('assignment_rules');
+    return res.status(200).json({ message: `Imported ${results.imported} rules.`, results });
+  } catch (error) {
+    console.error('Bulk rule import error:', error);
+    return res.status(500).json({ error: 'Server error during bulk import.' });
+  }
+};
+
 module.exports = {
   getAllRules,
   createRule,
   deleteRule,
   updateRule,
+  createRulesBulk,
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +11,9 @@ import {
     User as UserIcon,
     Bell,
     Workflow,
-    StickyNote
+    StickyNote,
+    Inbox,
+    Tag
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -37,39 +39,32 @@ const Sidebar = () => {
             </div>
 
             {/* Navigation Links */}
-            <nav className="flex-1 px-2 group-hover:px-3 py-6 space-y-2 overflow-y-auto overflow-x-hidden">
-                <NavLink to="/" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-2 overflow-hidden">
-                    <div className="flex items-center justify-center min-w-[20px] h-4">
+            <nav className="flex-1 px-2 group-hover:px-3 py-2 space-y-0 overflow-y-auto overflow-x-hidden">
+                <NavLink to="/" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-1 overflow-hidden">
+                    <div className="flex items-center justify-center min-w-[20px] h-3">
                         <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
                     </div>
                     <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Dashboard</span>
                 </NavLink>
 
-                <NavLink to="/kanban" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-2 overflow-hidden">
+                <NavLink to="/kanban" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-1 overflow-hidden">
                     <div className="flex items-center justify-center min-w-[20px] h-4">
                         <Trello className="h-4 w-4 flex-shrink-0" />
                     </div>
                     <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Kanban Board</span>
                 </NavLink>
 
-                <NavLink to="/list" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-2 overflow-hidden">
+                <NavLink to="/list" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-1 overflow-hidden">
                     <div className="flex items-center justify-center min-w-[20px] h-4">
-                        <ListTodo className="h-4 w-4 flex-shrink-0" />
+                        <Inbox className="h-4 w-4 flex-shrink-0" />
                     </div>
-                    <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Task Grid List</span>
+                    <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Inbox</span>
                 </NavLink>
 
-                {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
-                    <NavLink to="/assignments" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-2 overflow-hidden">
-                        <div className="flex items-center justify-center min-w-[20px] h-4">
-                            <Workflow className="h-4 w-4 flex-shrink-0" />
-                        </div>
-                        <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Auto Assignments</span>
-                    </NavLink>
-                )}
+
 
                 {user?.role === 'ADMIN' && (
-                    <NavLink to="/unassigned-notes" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-2 overflow-hidden">
+                    <NavLink to="/unassigned-notes" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-1 overflow-hidden">
                         <div className="flex items-center justify-center min-w-[20px] h-4">
                             <StickyNote className="h-4 w-4 flex-shrink-0" />
                         </div>
@@ -77,7 +72,7 @@ const Sidebar = () => {
                     </NavLink>
                 )}
 
-                <NavLink to="/notifications" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-2 overflow-hidden relative">
+                <NavLink to="/notifications" className="sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 w-8 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-1 overflow-hidden relative">
                     <div className="flex items-center justify-center min-w-[20px] h-4 relative">
                         <Bell className="h-4 w-4 flex-shrink-0" />
                         {unreadCount > 0 && (
@@ -94,6 +89,16 @@ const Sidebar = () => {
                             </span>
                         )}
                     </span>
+                </NavLink>
+
+                <NavLink
+                    to="/groups"
+                    className="w-full sidebar-link flex items-center justify-center group-hover:justify-start gap-3 mx-auto group-hover:mx-0 group-hover:w-full aspect-square group-hover:aspect-auto px-0 group-hover:px-3 py-0 group-hover:py-1 overflow-hidden"
+                >
+                    <div className="flex items-center justify-center min-w-[20px] h-4">
+                        <Tag className="h-4 w-4 flex-shrink-0" />
+                    </div>
+                    <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap hidden group-hover:inline">Manage Groups</span>
                 </NavLink>
             </nav>
 

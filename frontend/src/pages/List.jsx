@@ -216,6 +216,7 @@ const List = ({ socket, searchVal }) => {
                                         <ArrowUpDown className="h-3 w-3" />
                                     </div>
                                 </th>
+
                                 <th className="px-4 py-1 cursor-pointer select-none" onClick={() => handleSort('assignedUser')}>
                                     <div className="flex items-center gap-1.5">
                                         <span>Assigned To</span>
@@ -253,9 +254,10 @@ const List = ({ socket, searchVal }) => {
                                     <td className="px-4 py-2 w-[10%]">
                                         <Badge value={task.priority} variant="priority" />
                                     </td>
+
                                     <td className="px-4 py-2 w-[15%]">
                                         <span className="font-semibold text-slate-800 light:text-slate-700 text-xs">
-                                            {task.assignedUser ? task.assignedUser.name : 'Unassigned'}
+                                            {task.assignedUser ? task.assignedUser.name : (task.team ? task.team.name : 'Unassigned')}
                                         </span>
                                     </td>
                                     <td className="px-4 py-2 text-slate-600 text-xs font-sans w-[10%]">

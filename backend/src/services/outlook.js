@@ -125,7 +125,8 @@ const exchangeAuthCode = async (code) => {
     return true;
   } catch (error) {
     console.error('Error exchanging auth code:', error.response?.data || error.message);
-    throw new Error('Failed to exchange auth token with Microsoft.');
+    const details = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+    throw new Error('Failed to exchange auth token with Microsoft. Details: ' + details);
   }
 };
 

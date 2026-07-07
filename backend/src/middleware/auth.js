@@ -44,7 +44,7 @@ const authenticateToken = async (req, res, next) => {
       } else {
         user = await prisma.user.findUnique({
           where: { id: decoded.id },
-          select: { id: true, email: true, name: true, role: true }
+          select: { id: true, email: true, name: true, role: true, teams: true }
         });
         if (user) {
           await redisClient.setEx(`user:${decoded.id}`, USER_CACHE_TTL_SEC, JSON.stringify(user));
@@ -58,7 +58,7 @@ const authenticateToken = async (req, res, next) => {
       } else {
         user = await prisma.user.findUnique({
           where: { id: decoded.id },
-          select: { id: true, email: true, name: true, role: true }
+          select: { id: true, email: true, name: true, role: true, teams: true }
         });
         if (user) {
           fallbackCache.set(decoded.id, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });

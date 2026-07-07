@@ -4,18 +4,23 @@ import { encrypt, decrypt } from '../utils/encryption';
 
 const AuthContext = createContext(null);
 
+const storedToken = sessionStorage.getItem('token');
+if (storedToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(storedToken);
   const [isLoading, setIsLoading] = useState(true);
 
   // Synchronize axios defaults when token changes
   useEffect(() => {
     if (token) {
-      localStorage.setItem('token', token);
+      sessionStorage.setItem('token', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
     }
   }, [token]);
@@ -129,13 +134,13 @@ export const AuthProvider = ({ children }) => {
           isRefreshing = true;
 
           return new Promise((resolve, reject) => {
-            const storedRefreshToken = localStorage.getItem('refreshToken');
+            const storedRefreshToken = sessionStorage.getItem('refreshToken');
 
             if (!storedRefreshToken) {
               processQueue(new Error('No refresh token available'), null);
               setToken(null);
               setUser(null);
-              localStorage.removeItem('refreshToken');
+              sessionStorage.removeItem('refreshToken');
               reject(error);
               isRefreshing = false;
               return;
@@ -148,7 +153,7 @@ export const AuthProvider = ({ children }) => {
 
                 // Save new tokens
                 setToken(newAccessToken);
-                localStorage.setItem('refreshToken', newRefreshToken);
+                sessionStorage.setItem('refreshToken', newRefreshToken);
 
                 // Update authorization header and process queue
                 originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
@@ -160,7 +165,7 @@ export const AuthProvider = ({ children }) => {
                 processQueue(refreshError, null);
                 setToken(null);
                 setUser(null);
-                localStorage.removeItem('refreshToken');
+                sessionStorage.removeItem('refreshToken');
                 reject(refreshError);
               })
               .then(() => {
@@ -184,7 +189,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.post('/api/auth/login', { email, password });
       const { token: receivedToken, refreshToken: receivedRefreshToken, user: receivedUser } = response.data;
-      localStorage.setItem('refreshToken', receivedRefreshToken);
+      sessionStorage.setItem('refreshToken', receivedRefreshToken);
       setToken(receivedToken);
       setUser(receivedUser);
       return { success: true };
@@ -216,13 +221,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    const storedRefreshToken = localStorage.getItem('refreshToken');
+    const storedRefreshToken = sessionStorage.getItem('refreshToken');
     if (storedRefreshToken) {
       axios.post('/api/auth/logout', { refreshToken: storedRefreshToken }).catch(() => { });
     }
     setToken(null);
     setUser(null);
-    localStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('refreshToken');
   };
 
   return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { MessageSquare, X, Send, ChevronLeft, Loader2 } from 'lucide-react';
+import { MessageSquare, X, Send, ChevronLeft, Loader2, Grid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange }) => {
@@ -31,7 +31,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get('/api/auth/users', {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -43,7 +43,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchHistory = async (userId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get(`/api/chat/messages/${userId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -130,7 +130,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await axios.get(`/api/search?q=${encodeURIComponent(globalSearchQuery)}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -248,6 +248,17 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
             </span>
           )}
         </button>
+
+        {/* More Options Button */}
+        {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+          <button
+            onClick={() => navigate('/assignments')}
+            className="p-2 rounded-xl bg-white/50 border border-black/5 hover:bg-white/80 transition-all text-slate-600 hover:text-slate-900 cursor-pointer"
+            title="Settings & Reports"
+          >
+            <Grid className="h-4 w-4" />
+          </button>
+        )}
 
         {/* Direct Messages Drawer Modal */}
         {isChatOpen && (

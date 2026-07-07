@@ -67,8 +67,8 @@ const processEmails = async () => {
           },
         };
 
-        const matchedUserId = await findAssignedUser(email.senderEmail, email.senderName);
-        if (matchedUserId) {
+        const assignmentMatch = await findAssignedUser(email.senderEmail, email.senderName);
+        if (assignmentMatch) {
           try {
             let emailRecord = await prisma.email.findUnique({
               where: { messageId: email.messageId },
@@ -100,7 +100,8 @@ const processEmails = async () => {
                 status: 'PENDING',
                 priority: 'MEDIUM',
                 emailId: emailRecord.id,
-                assignedUserId: matchedUserId,
+                assignedUserId: assignmentMatch.assignedUserId,
+                teamId: assignmentMatch.teamId,
                 createdAt: email.receivedAt,
                 updatedAt: email.receivedAt,
               },

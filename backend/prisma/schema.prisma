@@ -23,6 +23,7 @@ model User {
   sentMessages        DirectMessage[]      @relation("SentMessages")
   receivedMessages    DirectMessage[]      @relation("ReceivedMessages")
   refreshTokens       RefreshToken[]       @relation("UserRefreshTokens")
+  teams               Team[]               @relation("UserTeams")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -55,6 +56,10 @@ model Task {
   aiSummary       String?         @db.Text
   assignedUserId  String?
   assignedUser    User?           @relation("TaskAssignee", fields: [assignedUserId], references: [id])
+  groupId         String?
+  group           TaskGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  teamId          String?
+  team            Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
   emailId         String?         @unique
   email           Email?          @relation(fields: [emailId], references: [id], onDelete: SetNull)
   attachments     Attachment[]
@@ -67,7 +72,27 @@ model Task {
   @@index([status])
   @@index([priority])
   @@index([assignedUserId])
+  @@index([groupId])
+  @@index([teamId])
   @@index([createdAt])
+}
+
+model TaskGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  users               User[]   @relation("UserTeams")
+  customerAssignments CustomerAssignment[]
+  tasks               Task[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Attachment {
@@ -161,8 +186,10 @@ model CustomerAssignment {
   id              String   @id @default(uuid())
   customerName    String?
   customerEmail   String?
-  assignedUserId  String
-  assignedUser    User     @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  assignedUserId  String?
+  assignedUser    User?    @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  teamId          String?
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

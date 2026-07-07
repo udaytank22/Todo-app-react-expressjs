@@ -127,7 +127,7 @@ const initSocket = (server, pubClient = null, subClient = null) => {
 
         // Emit to web clients (unencrypted)
         io.to(`user_${socket.userId}`).to(`user_${receiverId}`).emit('receive_direct_message', message);
-        
+
         // Emit to mobile clients (encrypted)
         const encryptedMessage = { encryptedData: encrypt(JSON.stringify(message)) };
         io.to(`user_${socket.userId}_mobile`).to(`user_${receiverId}_mobile`).emit('receive_direct_message', encryptedMessage);
@@ -192,7 +192,7 @@ const encryptPayload = (data) => {
 const emitNewInquiry = (task) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting new_inquiry: ${task.inquiryId} to admins, managers, and assignee`);
-  
+
   const payload = {
     id: task.id,
     inquiryId: task.inquiryId,
@@ -230,7 +230,7 @@ const emitNewInquiry = (task) => {
 const emitStatusUpdate = (payload) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting task_status_updated for task: ${payload.taskId}`);
-  
+
   // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('task_status_updated', payload);
   if (payload.assignedUserId) {
@@ -247,16 +247,21 @@ const emitStatusUpdate = (payload) => {
 
 /**
  * Broadcast a task assignment change to scoped clients.
- * @param {object} payload - { taskId, task, assignedUserId }
+ * @param {object} payload - { taskId, task, assignedUserId, recipientIds }
  */
 const emitTaskAssigned = (payload) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting task_assigned for task: ${payload.taskId}`);
-  
+
   // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('task_assigned', payload);
   if (payload.assignedUserId) {
     io.to(`user_${payload.assignedUserId}`).emit('task_assigned', payload);
+  }
+  if (payload.recipientIds && payload.recipientIds.length > 0) {
+    payload.recipientIds.forEach(id => {
+      io.to(`user_${id}`).emit('task_assigned', payload);
+    });
   }
 
   // Mobile clients (encrypted)
@@ -264,6 +269,11 @@ const emitTaskAssigned = (payload) => {
   io.to('role_ADMIN_mobile').to('role_MANAGER_mobile').emit('task_assigned', encPayload);
   if (payload.assignedUserId) {
     io.to(`user_${payload.assignedUserId}_mobile`).emit('task_assigned', encPayload);
+  }
+  if (payload.recipientIds && payload.recipientIds.length > 0) {
+    payload.recipientIds.forEach(id => {
+      io.to(`user_${id}_mobile`).emit('task_assigned', encPayload);
+    });
   }
 };
 
@@ -274,7 +284,7 @@ const emitTaskAssigned = (payload) => {
 const emitNewComment = (payload) => {
   if (!io) return;
   console.log(`[Socket.IO] Broadcasting new_comment for task: ${payload.taskId}`);
-  
+
   // Web clients (unencrypted)
   io.to('role_ADMIN').to('role_MANAGER').emit('new_comment', payload);
   if (payload.assignedUserId) {
@@ -297,7 +307,7 @@ const emitNewComment = (payload) => {
 const emitNewNotification = (notification) => {
   if (!io) return;
   console.log(`[Socket.IO] Emitting new_notification to room: user_${notification.userId}`);
-  
+
   // Web clients (unencrypted)
   io.to(`user_${notification.userId}`).emit('new_notification', notification);
 

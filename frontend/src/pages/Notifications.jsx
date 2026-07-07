@@ -143,12 +143,12 @@ const Notifications = () => {
 
                 {unreadCount > 0 && (
                     <Button
-                        variant="secondary"
+                        variant="ghost"
+                        icon={<CheckCheck className="h-4 w-4" />}
                         onClick={handleMarkAllRead}
-                        className="flex items-center gap-2 text-xs font-semibold py-2 px-4 border-black/5 hover:bg-slate-100/40 text-slate-700 light:text-slate-700"
+                        className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 bg-slate-100/50 hover:bg-sky-50 text-slate-600 hover:text-sky-600 border border-slate-200/60 rounded-lg shadow-sm transition-colors"
                     >
-                        <CheckCheck className="h-4 w-4 text-sky-400" />
-                        <span>Mark all as read</span>
+                        Mark all as read
                     </Button>
                 )}
             </div>
