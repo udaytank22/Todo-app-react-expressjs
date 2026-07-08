@@ -27,7 +27,6 @@ const UnassignedNotes = () => {
             setError('');
             try {
                 const response = await axios.get(`/api/tasks`, {
-                    headers: { Authorization: `Bearer ${token}` },
                     params: {
                         unassigned: 'true',
                         date: selectedDate,

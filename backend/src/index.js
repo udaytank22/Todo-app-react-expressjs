@@ -80,12 +80,32 @@ const startServer = async () => {
     cors({
       origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-client-device', 'x-client-encrypted'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-client-device', 'x-client-encrypted', 'x-csrf-token'],
+      credentials: true,
     })
   );
 
+  app.use(require('cookie-parser')());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // CSRF protection for browser-based API clients (ignores GET/HEAD/OPTIONS, requests with Authorization header, or anonymous requests)
+  const { csrfProtection } = require('./middleware/csrf');
+  const csrfMiddleware = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const hasSessionCookie = req.cookies && req.cookies.token;
+
+    if (
+      ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ||
+      authHeader ||
+      !hasSessionCookie
+    ) {
+      return next();
+    }
+
+    return csrfProtection(req, res, next);
+  };
+  app.use('/api', csrfMiddleware);
   app.use(encryptionMiddleware);
   app.use(express.static(path.join(__dirname, '../public')));
 

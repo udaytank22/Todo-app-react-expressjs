@@ -33,10 +33,24 @@ const initSocket = (server, pubClient = null, subClient = null) => {
     cors: {
       origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
       methods: ['GET', 'POST'],
+      credentials: true,
     },
     // Prefer WebSocket transport; fall back to polling if needed
     transports: ['websocket', 'polling'],
   });
+
+  // Helper to parse cookies from header
+  const parseCookies = (cookieHeader) => {
+    if (!cookieHeader) return {};
+    const cookies = {};
+    cookieHeader.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      const name = parts[0].trim();
+      const value = parts.slice(1).join('=').trim();
+      cookies[name] = decodeURIComponent(value);
+    });
+    return cookies;
+  };
 
   // ── Redis Adapter (Phase 1) ───────────────────────────────────────────────
   // Attach only when both Redis clients are connected. This lets every server
@@ -52,10 +66,15 @@ const initSocket = (server, pubClient = null, subClient = null) => {
   // ── JWT Authentication Middleware (Phase 1) ───────────────────────────────
   // Reject unauthenticated socket connections before they can join any room.
   io.use((socket, next) => {
-    // Accept token from handshake.auth (preferred) or query string (legacy)
-    const token =
+    // Accept token from handshake.auth (preferred), cookie fallback, or query string (legacy)
+    let token =
       socket.handshake.auth?.token ||
       socket.handshake.query?.token;
+
+    if (!token && socket.handshake.headers.cookie) {
+      const parsedCookies = parseCookies(socket.handshake.headers.cookie);
+      token = parsedCookies.token;
+    }
 
     if (!token) {
       return next(new Error('Authentication required. Provide a JWT token in socket.handshake.auth.token.'));

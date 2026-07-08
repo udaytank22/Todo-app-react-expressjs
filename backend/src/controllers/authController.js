@@ -115,9 +115,22 @@ const login = async (req, res) => {
       },
     });
 
+    const cookieOpts = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.COOKIE_SAME_SITE || 'Lax',
+      path: '/',
+    };
+    res.cookie('token', token, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    const { generateCsrfToken } = require('../middleware/csrf');
+    const csrfToken = generateCsrfToken(req, res);
+
     return res.json({
       token,
       refreshToken,
+      csrfToken,
       user: {
         id: user.id,
         email: user.email,
@@ -150,6 +163,9 @@ const getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }
+
+    const { generateCsrfToken } = require('../middleware/csrf');
+    generateCsrfToken(req, res);
 
     return res.json(user);
   } catch (error) {
@@ -184,7 +200,10 @@ const getAllUsers = async (req, res) => {
  * Refresh Access Token
  */
 const refresh = async (req, res) => {
-  const { refreshToken } = req.body;
+  let refreshToken = req.body.refreshToken;
+  if (!refreshToken && req.cookies) {
+    refreshToken = req.cookies.refreshToken;
+  }
 
   if (!refreshToken) {
     return res.status(400).json({ error: 'Refresh token is required.' });
@@ -234,9 +253,22 @@ const refresh = async (req, res) => {
       }),
     ]);
 
+    const cookieOpts = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.COOKIE_SAME_SITE || 'Lax',
+      path: '/',
+    };
+    res.cookie('token', newAccessToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
+    res.cookie('refreshToken', newRefreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    const { generateCsrfToken } = require('../middleware/csrf');
+    const csrfToken = generateCsrfToken(req, res);
+
     return res.json({
       token: newAccessToken,
       refreshToken: newRefreshToken,
+      csrfToken,
     });
   } catch (error) {
     console.error('Refresh token error:', error);
@@ -248,10 +280,24 @@ const refresh = async (req, res) => {
  * Logout and invalidate refresh token
  */
 const logout = async (req, res) => {
-  const { refreshToken } = req.body;
+  let refreshToken = req.body.refreshToken;
+  if (!refreshToken && req.cookies) {
+    refreshToken = req.cookies.refreshToken;
+  }
+
+  // Always clear cookies
+  const cookieOpts = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.COOKIE_SAME_SITE || 'Lax',
+    path: '/',
+  };
+  res.clearCookie('token', cookieOpts);
+  res.clearCookie('refreshToken', cookieOpts);
+  res.clearCookie('csrfToken', { ...cookieOpts, httpOnly: false });
 
   if (!refreshToken) {
-    return res.status(400).json({ error: 'Refresh token is required.' });
+    return res.json({ message: 'Logged out successfully.' });
   }
 
   try {

@@ -6,10 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 // Fetch all groups
 export const fetchGroups = createAsyncThunk('groups/fetchGroups', async (_, { rejectWithValue }) => {
   try {
-    const token = sessionStorage.getItem('token');
-    const response = await axios.get(`${API_URL}/groups`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.get(`${API_URL}/groups`);
     return response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to fetch groups');
@@ -18,10 +15,7 @@ export const fetchGroups = createAsyncThunk('groups/fetchGroups', async (_, { re
 
 export const createGroup = createAsyncThunk('groups/createGroup', async (name, { rejectWithValue }) => {
   try {
-    const token = sessionStorage.getItem('token');
-    const response = await axios.post(`${API_URL}/groups`, { name }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.post(`${API_URL}/groups`, { name });
     return response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to create group');
@@ -30,10 +24,7 @@ export const createGroup = createAsyncThunk('groups/createGroup', async (name, {
 
 export const updateGroup = createAsyncThunk('groups/updateGroup', async ({ id, name }, { rejectWithValue }) => {
   try {
-    const token = sessionStorage.getItem('token');
-    const response = await axios.put(`${API_URL}/groups/${id}`, { name }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await axios.put(`${API_URL}/groups/${id}`, { name });
     return response.data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to update group');
@@ -42,10 +33,7 @@ export const updateGroup = createAsyncThunk('groups/updateGroup', async ({ id, n
 
 export const deleteGroup = createAsyncThunk('groups/deleteGroup', async (id, { rejectWithValue }) => {
   try {
-    const token = sessionStorage.getItem('token');
-    await axios.delete(`${API_URL}/groups/${id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await axios.delete(`${API_URL}/groups/${id}`);
     return id;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to delete group');

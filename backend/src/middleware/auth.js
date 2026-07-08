@@ -44,6 +44,11 @@ const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   let token = authHeader && authHeader.split(' ')[1]; // Expecting: "Bearer <token>"
 
+  // Fallback to cookie token if header is missing
+  if (!token && req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
+
   // Fallback to query parameter token (useful for standard HTML <a> link downloads)
   if (!token && req.query.token) {
     token = req.query.token;
