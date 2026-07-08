@@ -302,3 +302,38 @@ const resetWorkerState = () => {
 };
 
 module.exports = { startEmailSyncWorker, stopEmailSyncWorker, resetWorkerState, _processEmails: processEmails };
+
+// Auto-start worker if run directly (e.g. via PM2 ecosystem or node CLI)
+if (require.main === module) {
+  // Ensure we validate required environment variables first
+  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY'];
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    console.error('==================================================');
+    console.error('  ERROR: Missing required environment variables:');
+    missing.forEach(v => console.error(`    - ${v}`));
+    console.error('==================================================');
+    process.exit(1);
+  }
+
+  // Load environment variables (usually config is already loaded by PM2, but fallback to dotenv)
+  require('dotenv').config();
+
+  startEmailSyncWorker();
+
+  const handleShutdown = () => {
+    logger.info('[Email Worker] Received shutdown signal. Stopping sync worker...');
+    stopEmailSyncWorker();
+    const { prisma } = require('../services/db');
+    prisma.$disconnect().then(() => {
+      logger.info('[Email Worker] Database disconnected. Exiting.');
+      process.exit(0);
+    }).catch((err) => {
+      logger.error(`[Email Worker] Error disconnecting database: ${err.message}`);
+      process.exit(1);
+    });
+  };
+
+  process.on('SIGTERM', handleShutdown);
+  process.on('SIGINT', handleShutdown);
+}

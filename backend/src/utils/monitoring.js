@@ -33,6 +33,13 @@ const metricsMiddleware = (req, res, next) => {
 
 // Deep Health Check function
 const checkHealth = async () => {
+  let outlookConnected = false;
+  try {
+    outlookConnected = await isConnected();
+  } catch (_) {
+    outlookConnected = false;
+  }
+
   const checks = {
     status: 'OK',
     timestamp: new Date(),
@@ -41,31 +48,39 @@ const checkHealth = async () => {
     checks: {
       database: 'unknown',
       redis: 'unknown',
-      outlook: isConnected() ? 'connected' : 'disconnected',
+      outlook: outlookConnected ? 'connected' : 'disconnected',
     }
   };
   
-  // DB Check
+  if (!outlookConnected) {
+    checks.status = 'DEGRADED';
+  }
+  
+  // DB Check (Critical dependency)
   try {
     await prisma.$queryRaw`SELECT 1`;
     checks.checks.database = 'healthy';
   } catch (err) {
     checks.checks.database = 'unhealthy';
-    checks.status = 'DEGRADED';
+    checks.status = 'DOWN'; // DB failure is a critical DOWN state
   }
   
-  // Redis Check
+  // Redis Check (Non-critical fallback dependency)
   try {
     if (redis.isReady) {
       await redis.ping();
       checks.checks.redis = 'healthy';
     } else {
       checks.checks.redis = 'unhealthy';
-      checks.status = 'DEGRADED';
+      if (checks.status !== 'DOWN') {
+        checks.status = 'DEGRADED';
+      }
     }
   } catch (err) {
     checks.checks.redis = 'unhealthy';
-    checks.status = 'DEGRADED';
+    if (checks.status !== 'DOWN') {
+      checks.status = 'DEGRADED';
+    }
   }
   
   return checks;
