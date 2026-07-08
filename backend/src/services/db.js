@@ -1,5 +1,11 @@
 const { PrismaClient } = require('@prisma/client');
 
+// ── Fail-fast: DATABASE_URL must be set in every environment ────────────────
+if (!process.env.DATABASE_URL) {
+  console.error('FATAL ERROR: DATABASE_URL environment variable is not set.');
+  process.exit(1);
+}
+
 const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   datasources: {
