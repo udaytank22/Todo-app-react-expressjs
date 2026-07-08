@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 const { encrypt, decrypt } = require('../utils/encryption');
 
 
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL ERROR: JWT_SECRET environment variable is not set.');
+  process.exit(1);
+}
+
 const JWT_SECRET = process.env.JWT_SECRET;
 
 let io = null;
