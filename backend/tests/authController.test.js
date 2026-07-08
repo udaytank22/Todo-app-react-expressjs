@@ -2,6 +2,7 @@
 process.env.JWT_SECRET = 'test-jwt-secret-key-32-chars-long';
 process.env.DATABASE_URL = 'postgresql://test@localhost:5432/db';
 process.env.MOBILE_ENCRYPTION_KEY = 'test-mobile-secret-key-32-chars-long';
+process.env.CSRF_SECRET = 'test-csrf-secret-key-32-chars-long';
 
 const request = require('supertest');
 const express = require('express');

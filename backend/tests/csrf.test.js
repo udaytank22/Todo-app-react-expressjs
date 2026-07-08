@@ -1,3 +1,5 @@
+process.env.CSRF_SECRET = 'test-csrf-secret-key-32-chars-long';
+
 const express = require('express');
 const request = require('supertest');
 const cookieParser = require('cookie-parser');

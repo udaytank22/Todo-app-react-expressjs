@@ -1,10 +1,15 @@
 const { doubleCsrf } = require('csrf-csrf');
 
+if (!process.env.CSRF_SECRET) {
+  console.error('FATAL ERROR: CSRF_SECRET environment variable is not set.');
+  process.exit(1);
+}
+
 const {
   generateCsrfToken,
   doubleCsrfProtection,
 } = doubleCsrf({
-  getSecret: () => process.env.JWT_SECRET || 'fallback-csrf-secret-key-32-chars-long',
+  getSecret: () => process.env.CSRF_SECRET,
   getSessionIdentifier: () => '', // Double submit cookie pattern does not strictly require session IDs
   cookieName: 'csrfToken',
   cookieOptions: {

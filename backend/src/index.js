@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // ── Startup Environment Validation ──────────────────────────────────────────
-const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY'];
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY', 'CSRF_SECRET'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
