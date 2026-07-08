@@ -1,4 +1,19 @@
 require('dotenv').config();
+
+// ── Startup Environment Validation ──────────────────────────────────────────
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('==================================================');
+  console.error('  FATAL STARTUP ERROR: Missing Environment Variables');
+  console.error('  The following required variables are not set:');
+  missingEnvVars.forEach(varName => console.error(`    - ${varName}`));
+  console.error('  Please check your .env file or environment config.');
+  console.error('==================================================');
+  process.exit(1);
+}
+
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
