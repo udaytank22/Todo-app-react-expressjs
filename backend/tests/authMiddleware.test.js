@@ -41,6 +41,11 @@ describe('Auth Middleware', () => {
       setEx: jest.fn(),
       del: jest.fn(),
     };
+
+    const authMiddleware = require('../src/middleware/auth');
+    if (authMiddleware._fallbackCache) {
+      authMiddleware._fallbackCache.clear();
+    }
   });
 
   describe('authenticateToken', () => {
@@ -144,6 +149,44 @@ describe('Auth Middleware', () => {
       await authenticateToken(req, res, next);
       expect(prisma.user.findUnique).not.toHaveBeenCalled(); // Cached in memory!
       expect(next).toHaveBeenCalled();
+    });
+
+    test('should evict oldest cache entry when in-memory cache exceeds MAX_CACHE_SIZE limit', async () => {
+      getIsRedisAvailable.mockReturnValue(false);
+      
+      const originalVerify = jwt.verify;
+      jwt.verify = jest.fn((token) => ({ id: token }));
+
+      prisma.user.findUnique.mockImplementation(({ where }) => Promise.resolve({
+        id: where.id,
+        email: `${where.id}@example.com`,
+        role: 'STAFF',
+        name: `User ${where.id}`
+      }));
+
+      // Authenticate 1001 users to exceed MAX_CACHE_SIZE (1000)
+      for (let i = 1; i <= 1001; i++) {
+        req.headers['authorization'] = `Bearer user-${i}`;
+        next.mockClear();
+        await authenticateToken(req, res, next);
+      }
+
+      // But 'user-2' (the second oldest) should still be in cache.
+      prisma.user.findUnique.mockClear();
+      req.headers['authorization'] = `Bearer user-2`;
+      next.mockClear();
+      await authenticateToken(req, res, next);
+      expect(prisma.user.findUnique).not.toHaveBeenCalled(); // cache hit!
+
+      // The first user 'user-1' should be evicted from the fallbackCache.
+      // If we request 'user-1' again, it should query the database (cache miss).
+      prisma.user.findUnique.mockClear();
+      req.headers['authorization'] = `Bearer user-1`;
+      next.mockClear();
+      await authenticateToken(req, res, next);
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1); // queried DB again (cache miss!)
+
+      jwt.verify = originalVerify;
     });
 
     test('should return 403 if user does not exist in DB/cache', async () => {
