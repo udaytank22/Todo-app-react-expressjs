@@ -7,9 +7,46 @@ const { findAssignedUser } = require('../utils/assignmentEngine');
 const { generateInquiryId } = require('../utils/idGenerator');
 const logger = require('../utils/logger');
 
+const { getPubClient, getIsRedisAvailable } = require('../services/redis');
+
 const prevEmailsMap = new Map();
 let syncInterval = null;
 let isSyncing = false;
+let isWorkerInitialized = false;
+
+const MAX_DEDUP_SIZE = 1000;
+const DEDUP_TTL_SEC = 7 * 24 * 3600; // 7 days
+
+/**
+ * Check and mark email as processed atomically using SET NX EX in Redis
+ * or fallback to bounded in-memory Map.
+ */
+const checkAndMarkEmailProcessed = async (messageId) => {
+  const redisClient = getPubClient();
+  if (redisClient && getIsRedisAvailable()) {
+    const key = `email:processed:${messageId}`;
+    // Atomic SET if Not Exists with TTL
+    const result = await redisClient.set(key, 'true', {
+      NX: true,
+      EX: DEDUP_TTL_SEC
+    });
+    return result === 'OK'; // true if first time seen, false if duplicate
+  } else {
+    // Fallback to bounded in-memory map
+    if (prevEmailsMap.has(messageId)) {
+      return false; // Already processed
+    }
+    // Evict oldest if we exceed size
+    if (prevEmailsMap.size >= MAX_DEDUP_SIZE) {
+      const oldestKey = prevEmailsMap.keys().next().value;
+      if (oldestKey !== undefined) {
+        prevEmailsMap.delete(oldestKey);
+      }
+    }
+    prevEmailsMap.set(messageId, true);
+    return true; // First time seen
+  }
+};
 
 const processEmails = async () => {
   if (isSyncing) return;
@@ -25,13 +62,33 @@ const processEmails = async () => {
     const freshEmails = await fetchEmails(true);
     logger.info(`[Bull Worker] Fetched ${freshEmails.length} emails.`);
 
-    if (prevEmailsMap.size === 0) {
-      freshEmails.forEach(e => prevEmailsMap.set(e.messageId, true));
-      logger.info(`[Bull Worker] Initialized. Monitoring ${freshEmails.length} existing messages.`);
+    // ── Startup Initialization ───────────────────────────────────────────────
+    // Populate the cache with currently visible emails without processing them as new
+    if (!isWorkerInitialized) {
+      logger.info(`[Bull Worker] Initializing. Monitoring ${freshEmails.length} existing messages.`);
+      const redisClient = getPubClient();
+      const useRedis = redisClient && getIsRedisAvailable();
+
+      for (const e of freshEmails) {
+        if (useRedis) {
+          const key = `email:processed:${e.messageId}`;
+          await redisClient.set(key, 'true', { EX: DEDUP_TTL_SEC });
+        } else {
+          prevEmailsMap.set(e.messageId, true);
+        }
+      }
+      isWorkerInitialized = true;
       return;
     }
 
-    const newEmails = freshEmails.filter(e => !prevEmailsMap.has(e.messageId));
+    // ── Atomic check and mark ────────────────────────────────────────────────
+    const newEmails = [];
+    for (const email of freshEmails) {
+      const isNew = await checkAndMarkEmailProcessed(email.messageId);
+      if (isNew) {
+        newEmails.push(email);
+      }
+    }
     logger.info(`[Bull Worker] Found ${newEmails.length} new email(s).`);
 
     if (newEmails.length > 0) {
@@ -152,18 +209,18 @@ const processEmails = async () => {
                     },
                   });
                 } catch (attErr) {
-                  logToFile(`[Bull Worker] Failed to save attachment: ${attErr.message}`);
+                  logger.error(`[Bull Worker] Failed to save attachment: ${attErr.message}`);
                 }
               }
             }
 
             taskObj.inquiryId = finalInquiryId;
-            taskObj.assignedUserId = matchedUserId;
+            taskObj.assignedUserId = assignmentMatch.assignedUserId;
             taskObj.assignedUser = task.assignedUser;
 
             await prisma.notification.create({
               data: {
-                userId: matchedUserId,
+                userId: assignmentMatch.assignedUserId,
                 type: 'ASSIGNMENT',
                 title: 'New Inquiry Automatically Assigned',
                 message: `Inquiry ${finalInquiryId} from ${email.senderName} has been automatically assigned to you.`,
@@ -178,7 +235,7 @@ const processEmails = async () => {
               emitNewNotification(assignmentNotif);
             }
           } catch (persistErr) {
-            logToFile(`[Bull Worker] Failed to persist assignment task: ${persistErr.message}`);
+            logger.error(`[Bull Worker] Failed to persist assignment task: ${persistErr.message}`);
           }
         }
 
@@ -212,7 +269,7 @@ const processEmails = async () => {
           logger.error(`[Email Worker] Failed to create notification: ${notifErr.message}`);
         }
 
-        prevEmailsMap.set(email.messageId, true);
+        // Already marked processed in checkAndMarkEmailProcessed
       }
     }
   } catch (error) {
@@ -238,4 +295,10 @@ const stopEmailSyncWorker = () => {
   }
 };
 
-module.exports = { startEmailSyncWorker, stopEmailSyncWorker };
+const resetWorkerState = () => {
+  prevEmailsMap.clear();
+  isWorkerInitialized = false;
+  isSyncing = false;
+};
+
+module.exports = { startEmailSyncWorker, stopEmailSyncWorker, resetWorkerState, _processEmails: processEmails };

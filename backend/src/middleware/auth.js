@@ -12,6 +12,30 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const fallbackCache = new Map();
 const USER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const USER_CACHE_TTL_SEC = 5 * 60; // 5 minutes
+const MAX_CACHE_SIZE = 1000;
+
+/**
+ * Add user session to fallbackCache with proactive pruning and FIFO eviction.
+ */
+const setInFallbackCache = (key, value) => {
+  const now = Date.now();
+  // Proactively prune expired entries
+  for (const [k, val] of fallbackCache.entries()) {
+    if (val.expiresAt <= now) {
+      fallbackCache.delete(k);
+    }
+  }
+
+  // Evict oldest entry if size is exceeded
+  if (fallbackCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = fallbackCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      fallbackCache.delete(oldestKey);
+    }
+  }
+
+  fallbackCache.set(key, { user: value, expiresAt: now + USER_CACHE_TTL_MS });
+};
 
 /**
  * Middleware to authenticate requests using JWT tokens
@@ -61,7 +85,7 @@ const authenticateToken = async (req, res, next) => {
           select: { id: true, email: true, name: true, role: true, teams: true }
         });
         if (user) {
-          fallbackCache.set(decoded.id, { user, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+          setInFallbackCache(decoded.id, user);
         }
       }
     }
@@ -110,4 +134,5 @@ const authorizeRoles = (allowedRoles) => {
 module.exports = {
   authenticateToken,
   authorizeRoles,
+  _fallbackCache: fallbackCache,
 };
