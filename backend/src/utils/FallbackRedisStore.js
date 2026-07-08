@@ -9,7 +9,15 @@ class FallbackRedisStore {
   }
 
   init(options) {
-    this.redisStore.init(options);
+    // Catch initialization errors (like Redis connection refused) to prevent crashing on startup
+    if (typeof this.redisStore.init === 'function') {
+      const res = this.redisStore.init(options);
+      if (res && typeof res.catch === 'function') {
+        res.catch(err => {
+          console.warn('[RateLimit] Failed to initialize RedisStore on startup (using MemoryStore fallback):', err.message);
+        });
+      }
+    }
     this.memoryStore.init(options);
   }
 
