@@ -400,7 +400,7 @@ const Administration = () => {
                 setUsers((prev) => prev.map((u) => u.id === editingId ? response.data : u));
             } else {
                 const response = await axios.post('/api/auth/users', payload, { headers });
-                setUsers((prev) => [...prev, response.data].sort((a,b) => a.name.localeCompare(b.name)));
+                setUsers((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
             }
 
             setIsOpen(false);
@@ -431,7 +431,7 @@ const Administration = () => {
                 setTeams((prev) => prev.map((t) => t.id === editingId ? response.data : t));
             } else {
                 const response = await axios.post('/api/teams', { name: teamForm.name }, { headers });
-                setTeams((prev) => [...prev, response.data].sort((a,b) => a.name.localeCompare(b.name)));
+                setTeams((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
             }
 
             setIsOpen(false);
@@ -494,20 +494,17 @@ const Administration = () => {
     const fileInputRef = useRef(null);
 
     const handleExport = () => {
+        let exportData = [];
+        let filename = '';
+        let isSample = false;
+
         if (activeTab === 'employees') {
-            const exportData = users.map(u => ({ Name: u.name, Email: u.email, Role: u.role }));
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Employees");
-            XLSX.writeFile(wb, "employees.xlsx");
+            exportData = users.map(u => ({ Name: u.name, Email: u.email, Role: u.role }));
+            filename = 'Employees';
         } else if (activeTab === 'teams') {
-            const exportData = teams.map(t => ({ Name: t.name, Members: t.users?.length || 0 }));
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Teams");
-            XLSX.writeFile(wb, "teams.xlsx");
+            exportData = teams.map(t => ({ Name: t.name, Members: t.users?.length || 0 }));
+            filename = 'Teams';
         } else if (activeTab === 'reports' && data) {
-            const exportData = data.statusCounts.map(s => ({ Status: s.status, Count: s.count }));
             exportData = [
                 ...data.statusCounts.map(s => ({ Category: 'Status', Name: s.status, Count: s.count })),
                 ...data.priorityCounts.map(p => ({ Category: 'Priority', Name: p.priority, Count: p.count })),
@@ -516,9 +513,9 @@ const Administration = () => {
             ];
             filename = 'Reports_Data';
         } else {
-            exportData = rules.map(r => ({ 
-                CustomerName: r.customerName || '', 
-                CustomerEmail: r.customerEmail || '', 
+            exportData = rules.map(r => ({
+                CustomerName: r.customerName || '',
+                CustomerEmail: r.customerEmail || '',
                 AssignedUserId: r.assignedUserId || '',
                 TeamId: r.teamId || ''
             }));
@@ -526,14 +523,32 @@ const Administration = () => {
         }
 
         if (exportData.length === 0) {
-            alert('No data available to export.');
-            return;
+            if (activeTab === 'reports') {
+                alert('No data available to export.');
+                return;
+            }
+
+            isSample = true;
+            if (activeTab === 'employees') {
+                exportData = [{ Name: 'Sample Employee', Email: 'sample@example.com', Role: 'STAFF' }];
+            } else if (activeTab === 'teams') {
+                exportData = [{ Name: 'Sample Team' }];
+            } else {
+                exportData = [{
+                    CustomerName: 'Acme Corp',
+                    CustomerEmail: '*@acme.com',
+                    AssignedUserId: 'user-id-or-leave-blank',
+                    TeamId: 'team-id-or-leave-blank'
+                }];
+            }
         }
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, filename);
-        XLSX.writeFile(wb, `${filename.toLowerCase()}.xlsx`);
+
+        const finalFilename = isSample ? `sample_${filename.toLowerCase()}.xlsx` : `${filename.toLowerCase()}.xlsx`;
+        XLSX.writeFile(wb, finalFilename);
     };
 
     const handleImport = async (e) => {
@@ -554,7 +569,7 @@ const Administration = () => {
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
                 const importedData = XLSX.utils.sheet_to_json(ws);
-                
+
                 const token = sessionStorage.getItem('token');
                 const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -582,7 +597,7 @@ const Administration = () => {
                     }));
                     await axios.post('/api/customer-assignments/bulk', { rules: mappedRules }, { headers });
                 }
-                
+
                 fetchData();
                 alert('Import successful!');
             } catch (err) {
@@ -619,10 +634,10 @@ const Administration = () => {
                 </div>
                 {activeTab !== 'reports' && (
                     <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <input 
-                            type="file" 
-                            accept=".xlsx, .xls" 
-                            className="hidden" 
+                        <input
+                            type="file"
+                            accept=".xlsx, .xls"
+                            className="hidden"
                             ref={fileInputRef}
                             onChange={handleImport}
                         />
@@ -657,44 +672,40 @@ const Administration = () => {
             <div className="flex space-x-1 bg-slate-200/50 p-1 rounded-xl w-full sm:w-fit border border-slate-200/60 shadow-inner">
                 <button
                     onClick={() => setActiveTab('employees')}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                        activeTab === 'employees'
-                            ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                    }`}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'employees'
+                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                        }`}
                 >
                     <Users className="h-4 w-4" />
                     Employees
                 </button>
                 <button
                     onClick={() => setActiveTab('teams')}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                        activeTab === 'teams'
-                            ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                    }`}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'teams'
+                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                        }`}
                 >
                     <Users className="h-4 w-4" />
                     Teams
                 </button>
                 <button
                     onClick={() => setActiveTab('assignments')}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                        activeTab === 'assignments'
-                            ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                    }`}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'assignments'
+                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                        }`}
                 >
                     <Link className="h-4 w-4" />
                     Assignment Rules
                 </button>
                 <button
                     onClick={() => setActiveTab('reports')}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                        activeTab === 'reports'
-                            ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                    }`}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'reports'
+                        ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                        }`}
                 >
                     <BarChart2 className="h-4 w-4" />
                     Reports
@@ -721,81 +732,80 @@ const Administration = () => {
                             </div>
                         </div>
                         <Card className="p-0 border-black/5 overflow-hidden shadow-sm">
-                        <div className="overflow-x-auto w-full">
-                            <table className="min-w-full text-left border-collapse">
-                                <thead className="bg-slate-50/80 border-b border-black/5 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
-                                    <tr>
-                                        <th className="px-6 py-3">Name</th>
-                                        <th className="px-6 py-3">Email</th>
-                                        <th className="px-6 py-3">Role</th>
-                                        <th className="px-6 py-3 text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-black/5 text-sm">
-                                    {users.filter(u => 
-                                        u.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()) || 
-                                        u.email.toLowerCase().includes(employeeSearchQuery.toLowerCase())
-                                    ).map((u) => (
-                                        <tr key={u.id} className="table-row-hover text-slate-700 bg-white">
-                                            <td className="px-6 py-3 font-semibold text-slate-900">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="bg-indigo-100 text-indigo-600 h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white">
-                                                        {u.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    {u.name}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <span className="flex items-center gap-2 font-sans text-xs">
-                                                    <Mail className="h-4 w-4 text-slate-400" />
-                                                    {u.email}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wide
-                                                    ${u.role === 'ADMIN' ? 'bg-rose-100 text-rose-700' :
-                                                      u.role === 'MANAGER' ? 'bg-amber-100 text-amber-700' :
-                                                      'bg-emerald-100 text-emerald-700'}`}>
-                                                    {u.role}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditEmployee(u)}
-                                                        className="p-1.5 rounded-lg border border-black/5 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 transition-colors"
-                                                        title="Edit employee"
-                                                    >
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteEmployee(u.id)}
-                                                        disabled={user.id === u.id} // Disable deleting self
-                                                        className={`p-1.5 rounded-lg border border-black/5 transition-colors ${
-                                                            user.id === u.id ? 'opacity-50 cursor-not-allowed text-slate-300' : 'hover:bg-rose-50 text-slate-500 hover:text-rose-500'
-                                                        }`}
-                                                        title="Delete employee"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {users.length === 0 && (
+                            <div className="overflow-x-auto w-full">
+                                <table className="min-w-full text-left border-collapse">
+                                    <thead className="bg-slate-50/80 border-b border-black/5 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                                         <tr>
-                                            <td colSpan="4" className="px-6 py-12 text-center text-slate-500 text-sm bg-white">
-                                                <div className="flex flex-col items-center justify-center gap-2.5">
-                                                    <Users className="h-8 w-8 text-slate-400" />
-                                                    <span>No employees found.</span>
-                                                </div>
-                                            </td>
+                                            <th className="px-6 py-3">Name</th>
+                                            <th className="px-6 py-3">Email</th>
+                                            <th className="px-6 py-3">Role</th>
+                                            <th className="px-6 py-3 text-center">Actions</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
+                                    </thead>
+                                    <tbody className="divide-y divide-black/5 text-sm">
+                                        {users.filter(u =>
+                                            u.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
+                                            u.email.toLowerCase().includes(employeeSearchQuery.toLowerCase())
+                                        ).map((u) => (
+                                            <tr key={u.id} className="table-row-hover text-slate-700 bg-white">
+                                                <td className="px-6 py-3 font-semibold text-slate-900">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="bg-indigo-100 text-indigo-600 h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white">
+                                                            {u.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        {u.name}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <span className="flex items-center gap-2 font-sans text-xs">
+                                                        <Mail className="h-4 w-4 text-slate-400" />
+                                                        {u.email}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wide
+                                                    ${u.role === 'ADMIN' ? 'bg-rose-100 text-rose-700' :
+                                                            u.role === 'MANAGER' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-emerald-100 text-emerald-700'}`}>
+                                                        {u.role}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEditEmployee(u)}
+                                                            className="p-1.5 rounded-lg border border-black/5 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 transition-colors"
+                                                            title="Edit employee"
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteEmployee(u.id)}
+                                                            disabled={user.id === u.id} // Disable deleting self
+                                                            className={`p-1.5 rounded-lg border border-black/5 transition-colors ${user.id === u.id ? 'opacity-50 cursor-not-allowed text-slate-300' : 'hover:bg-rose-50 text-slate-500 hover:text-rose-500'
+                                                                }`}
+                                                            title="Delete employee"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {users.length === 0 && (
+                                            <tr>
+                                                <td colSpan="4" className="px-6 py-12 text-center text-slate-500 text-sm bg-white">
+                                                    <div className="flex flex-col items-center justify-center gap-2.5">
+                                                        <Users className="h-8 w-8 text-slate-400" />
+                                                        <span>No employees found.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
                     </div>
                 ) : activeTab === 'teams' ? (
                     <div className="space-y-4">
@@ -812,67 +822,67 @@ const Administration = () => {
                             </div>
                         </div>
                         <Card className="p-0 border-black/5 overflow-hidden shadow-sm">
-                        <div className="overflow-x-auto w-full">
-                            <table className="min-w-full text-left border-collapse">
-                                <thead className="bg-slate-50/80 border-b border-black/5 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
-                                    <tr>
-                                        <th className="px-6 py-3">Team Name</th>
-                                        <th className="px-6 py-3 text-center">Members</th>
-                                        <th className="px-6 py-3 text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-black/5 text-sm">
-                                    {teams.filter(t => 
-                                        t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())
-                                    ).map((t) => (
-                                        <tr key={t.id} className="table-row-hover text-slate-700 bg-white">
-                                            <td className="px-6 py-3 font-semibold text-slate-900">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="bg-sky-100 text-sky-600 h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white">
-                                                        {t.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    {t.name}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-3 text-center">
-                                                <span className="inline-flex items-center justify-center bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-semibold">
-                                                    {t.users?.length || 0} members
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditTeam(t)}
-                                                        className="p-1.5 rounded-lg border border-black/5 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-colors"
-                                                        title="Edit team"
-                                                    >
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteTeam(t.id)}
-                                                        className="p-1.5 rounded-lg border border-black/5 hover:bg-rose-50 text-slate-500 hover:text-rose-500 transition-colors"
-                                                        title="Delete team"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {teams.length === 0 && (
+                            <div className="overflow-x-auto w-full">
+                                <table className="min-w-full text-left border-collapse">
+                                    <thead className="bg-slate-50/80 border-b border-black/5 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                                         <tr>
-                                            <td colSpan="3" className="px-6 py-12 text-center text-slate-500 text-sm bg-white">
-                                                <div className="flex flex-col items-center justify-center gap-2.5">
-                                                    <Users className="h-8 w-8 text-slate-400" />
-                                                    <span>No teams found.</span>
-                                                </div>
-                                            </td>
+                                            <th className="px-6 py-3">Team Name</th>
+                                            <th className="px-6 py-3 text-center">Members</th>
+                                            <th className="px-6 py-3 text-center">Actions</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
+                                    </thead>
+                                    <tbody className="divide-y divide-black/5 text-sm">
+                                        {teams.filter(t =>
+                                            t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())
+                                        ).map((t) => (
+                                            <tr key={t.id} className="table-row-hover text-slate-700 bg-white">
+                                                <td className="px-6 py-3 font-semibold text-slate-900">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="bg-sky-100 text-sky-600 h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white">
+                                                            {t.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        {t.name}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-3 text-center">
+                                                    <span className="inline-flex items-center justify-center bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                                        {t.users?.length || 0} members
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEditTeam(t)}
+                                                            className="p-1.5 rounded-lg border border-black/5 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-colors"
+                                                            title="Edit team"
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteTeam(t.id)}
+                                                            className="p-1.5 rounded-lg border border-black/5 hover:bg-rose-50 text-slate-500 hover:text-rose-500 transition-colors"
+                                                            title="Delete team"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {teams.length === 0 && (
+                                            <tr>
+                                                <td colSpan="3" className="px-6 py-12 text-center text-slate-500 text-sm bg-white">
+                                                    <div className="flex flex-col items-center justify-center gap-2.5">
+                                                        <Users className="h-8 w-8 text-slate-400" />
+                                                        <span>No teams found.</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
                     </div>
                 ) : (
                     <Card className="p-0 border-black/5 overflow-hidden shadow-sm">
@@ -880,8 +890,8 @@ const Administration = () => {
                             <table className="min-w-full text-left border-collapse">
                                 <thead className="bg-slate-50/80 border-b border-black/5 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-3">Customer Name Pattern</th>
-                                        <th className="px-6 py-3">Customer Email Pattern</th>
+                                        <th className="px-6 py-3">Customer Name</th>
+                                        <th className="px-6 py-3">Customer Domain</th>
                                         <th className="px-6 py-3">Assigned Employee</th>
                                         <th className="px-6 py-3 text-center">Actions</th>
                                     </tr>
@@ -974,8 +984,8 @@ const Administration = () => {
                         setIsOpen(false);
                         setEditingId(null);
                     }}
-                    title={editingId 
-                        ? (activeTab === 'assignments' ? "Edit Assignment Rule" : activeTab === 'teams' ? "Edit Team" : "Edit Employee") 
+                    title={editingId
+                        ? (activeTab === 'assignments' ? "Edit Assignment Rule" : activeTab === 'teams' ? "Edit Team" : "Edit Employee")
                         : (activeTab === 'assignments' ? "Create Assignment Rule" : activeTab === 'teams' ? "Add Team" : "Add Employee")
                     }
                     size="md"
@@ -1006,7 +1016,7 @@ const Administration = () => {
                                 <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-100/50 p-4 rounded-xl text-indigo-700 text-sm">
                                     <Sparkles className="h-5 w-5 flex-shrink-0 mt-0.5" />
                                     <p>
-                                        Specify the customer's exact email address (exact match) and/or name keyword (case-insensitive substring match).
+                                        Specify the customer's exact email address or domain (exact match) and/or name keyword (case-insensitive substring match). For common email providers (e.g. Gmail, Yahoo), you must provide the full email address.
                                     </p>
                                 </div>
 
@@ -1113,7 +1123,7 @@ const Administration = () => {
                                                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                                                     checked={employeeForm.teamIds.includes(t.id)}
                                                     onChange={(e) => {
-                                                        const newIds = e.target.checked 
+                                                        const newIds = e.target.checked
                                                             ? [...employeeForm.teamIds, t.id]
                                                             : employeeForm.teamIds.filter(id => id !== t.id);
                                                         setEmployeeForm({ ...employeeForm, teamIds: newIds });

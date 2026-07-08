@@ -13,14 +13,26 @@ const findAssignedUser = async (email, name) => {
     const normalizedEmail = email ? email.trim().toLowerCase() : '';
     const normalizedName = name ? name.trim().toLowerCase() : '';
 
-    // 1. Try to match by email domain first (high priority match)
+    const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com', 'live.com', 'msn.com'];
+
+    // 1. Try to match by email first (high priority match)
     const emailDomain = normalizedEmail.includes('@') ? normalizedEmail.split('@')[1] : normalizedEmail;
     
     for (const rule of rules) {
       if (rule.customerEmail) {
-        const ruleDomain = rule.customerEmail.includes('@') ? rule.customerEmail.split('@')[1].toLowerCase() : rule.customerEmail.toLowerCase();
-        if (emailDomain === ruleDomain) {
-          return { assignedUserId: rule.assignedUserId, teamId: rule.teamId };
+        const ruleEmail = rule.customerEmail.toLowerCase();
+        const ruleDomain = ruleEmail.includes('@') ? ruleEmail.split('@')[1] : ruleEmail;
+        
+        // For common email providers, require an exact full email match
+        if (commonDomains.includes(emailDomain) || commonDomains.includes(ruleDomain)) {
+          if (normalizedEmail === ruleEmail) {
+            return { assignedUserId: rule.assignedUserId, teamId: rule.teamId };
+          }
+        } else {
+          // For company/custom domains, match by domain
+          if (emailDomain === ruleDomain) {
+            return { assignedUserId: rule.assignedUserId, teamId: rule.teamId };
+          }
         }
       }
     }
