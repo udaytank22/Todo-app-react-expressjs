@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // ── Startup Environment Validation ──────────────────────────────────────────
-const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY'];
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY', 'CSRF_SECRET'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
@@ -80,12 +80,32 @@ const startServer = async () => {
     cors({
       origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-client-device', 'x-client-encrypted'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-client-device', 'x-client-encrypted', 'x-csrf-token'],
+      credentials: true,
     })
   );
 
+  app.use(require('cookie-parser')());
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // CSRF protection for browser-based API clients (ignores GET/HEAD/OPTIONS, requests with Authorization header, or anonymous requests)
+  const { csrfProtection } = require('./middleware/csrf');
+  const csrfMiddleware = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const hasSessionCookie = req.cookies && req.cookies.token;
+
+    if (
+      ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ||
+      authHeader ||
+      !hasSessionCookie
+    ) {
+      return next();
+    }
+
+    return csrfProtection(req, res, next);
+  };
+  app.use('/api', csrfMiddleware);
   app.use(encryptionMiddleware);
   app.use(express.static(path.join(__dirname, '../public')));
 
@@ -96,88 +116,7 @@ const startServer = async () => {
   app.set('trust proxy', 1);
 
   // ── 5. Rate Limiting (Redis-backed or in-memory fallback) ───────────────
-  const { MemoryStore } = require('express-rate-limit');
-
-  /**
-   * Custom rate-limiting store wrapper that routes commands to RedisStore
-   * when Redis is connected and healthy, but falls back dynamically to
-   * MemoryStore on any connectivity error.
-   */
-  class FallbackRedisStore {
-    constructor(redisStoreOpts) {
-      this.redisStore = new RedisStore(redisStoreOpts);
-      this.memoryStore = new MemoryStore();
-    }
-
-    init(options) {
-      this.redisStore.init(options);
-      this.memoryStore.init(options);
-    }
-
-    async get(key) {
-      if (getIsRedisAvailable()) {
-        try {
-          return await this.redisStore.get(key);
-        } catch (err) {
-          console.error('[RateLimit] Redis get error, falling back to MemoryStore:', err.message);
-        }
-      }
-      return await this.memoryStore.get(key);
-    }
-
-    async increment(key) {
-      if (getIsRedisAvailable()) {
-        try {
-          return await this.redisStore.increment(key);
-        } catch (err) {
-          console.error('[RateLimit] Redis increment error, falling back to MemoryStore:', err.message);
-        }
-      }
-      return await this.memoryStore.increment(key);
-    }
-
-    async decrement(key) {
-      if (getIsRedisAvailable()) {
-        try {
-          return await this.redisStore.decrement(key);
-        } catch (err) {
-          console.error('[RateLimit] Redis decrement error, falling back to MemoryStore:', err.message);
-        }
-      }
-      return await this.memoryStore.decrement(key);
-    }
-
-    async resetKey(key) {
-      if (getIsRedisAvailable()) {
-        try {
-          return await this.redisStore.resetKey(key);
-        } catch (err) {
-          console.error('[RateLimit] Redis resetKey error, falling back to MemoryStore:', err.message);
-        }
-      }
-      return await this.memoryStore.resetKey(key);
-    }
-
-    async resetAll() {
-      if (getIsRedisAvailable()) {
-        try {
-          return await this.redisStore.resetAll();
-        } catch (err) {
-          console.error('[RateLimit] Redis resetAll error, falling back to MemoryStore:', err.message);
-        }
-      }
-      return await this.memoryStore.resetAll();
-    }
-
-    shutdown() {
-      if (typeof this.redisStore.shutdown === 'function') {
-        this.redisStore.shutdown();
-      }
-      if (typeof this.memoryStore.shutdown === 'function') {
-        this.memoryStore.shutdown();
-      }
-    }
-  }
+  const { FallbackRedisStore } = require('./utils/FallbackRedisStore');
 
   const buildRateLimiter = (opts) => {
     const { keyPrefix, ...rateLimitOpts } = opts;

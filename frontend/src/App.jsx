@@ -76,9 +76,7 @@ const AppContent = () => {
     const fetchMailStatus = async () => {
         if (!token) return;
         try {
-            const response = await axios.get('/api/emails/status', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await axios.get('/api/emails/status');
             setIsMailConnected(response.data.connected);
             setIsDemoMode(response.data.demoMode);
         } catch (error) {
@@ -105,11 +103,11 @@ const AppContent = () => {
         }
 
         // Connect socket (Vite proxies this to backend)
-        // Phase 1: Pass JWT token in auth so the backend socket middleware can
-        // verify the connection before admitting the client.
+        // With credentials enabled, cookies are automatically sent with the WebSocket connection handshake.
         const newSocket = io(window.location.origin, {
             transports: ['websocket'],
-            auth: { token, device: 'mobile' },
+            auth: { device: 'mobile' },
+            withCredentials: true,
         });
 
         // Patch socket.emit for outgoing encryption

@@ -37,10 +37,7 @@ const ReportsView = () => {
     useEffect(() => {
         const fetchReports = async () => {
             try {
-                const token = sessionStorage.getItem('token');
-                const res = await axios.get('/api/reports/dashboard', {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {}
-                });
+                const res = await axios.get('/api/reports/dashboard');
                 setData(res.data);
             } catch (err) {
                 console.error('Failed to fetch reports:', err);
@@ -257,13 +254,10 @@ const Administration = () => {
         setIsLoading(true);
         setError('');
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
             const [rulesRes, usersRes, teamsRes] = await Promise.all([
-                axios.get('/api/customer-assignments', { headers }),
-                axios.get('/api/auth/users', { headers }),
-                axios.get('/api/teams', { headers })
+                axios.get('/api/customer-assignments'),
+                axios.get('/api/auth/users'),
+                axios.get('/api/teams')
             ]);
 
             setRules(rulesRes.data);
@@ -345,9 +339,6 @@ const Administration = () => {
         setSubmitting(true);
         setError('');
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
             const payload = {
                 customerName: ruleForm.customerName.trim() || null,
                 customerEmail: ruleForm.customerEmail.trim() || null,
@@ -356,10 +347,10 @@ const Administration = () => {
             };
 
             if (editingId) {
-                const response = await axios.put(`/api/customer-assignments/${editingId}`, payload, { headers });
+                const response = await axios.put(`/api/customer-assignments/${editingId}`, payload);
                 setRules((prev) => prev.map((r) => r.id === editingId ? response.data : r));
             } else {
-                const response = await axios.post('/api/customer-assignments', payload, { headers });
+                const response = await axios.post('/api/customer-assignments', payload);
                 setRules((prev) => [response.data, ...prev]);
             }
 
@@ -387,19 +378,16 @@ const Administration = () => {
         setSubmitting(true);
         setError('');
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
             const payload = { ...employeeForm };
             if (editingId && !payload.password) {
                 delete payload.password; // Don't send empty password if not changing
             }
 
             if (editingId) {
-                const response = await axios.put(`/api/auth/users/${editingId}`, payload, { headers });
+                const response = await axios.put(`/api/auth/users/${editingId}`, payload);
                 setUsers((prev) => prev.map((u) => u.id === editingId ? response.data : u));
             } else {
-                const response = await axios.post('/api/auth/users', payload, { headers });
+                const response = await axios.post('/api/auth/users', payload);
                 setUsers((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
             }
 
@@ -423,14 +411,11 @@ const Administration = () => {
         setSubmitting(true);
         setError('');
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
             if (editingId) {
-                const response = await axios.put(`/api/teams/${editingId}`, { name: teamForm.name }, { headers });
+                const response = await axios.put(`/api/teams/${editingId}`, { name: teamForm.name });
                 setTeams((prev) => prev.map((t) => t.id === editingId ? response.data : t));
             } else {
-                const response = await axios.post('/api/teams', { name: teamForm.name }, { headers });
+                const response = await axios.post('/api/teams', { name: teamForm.name });
                 setTeams((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
             }
 
@@ -449,10 +434,7 @@ const Administration = () => {
         if (!window.confirm('Are you sure you want to delete this auto-assignment rule?')) return;
 
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-            await axios.delete(`/api/customer-assignments/${id}`, { headers });
+            await axios.delete(`/api/customer-assignments/${id}`);
             setRules((prev) => prev.filter((r) => r.id !== id));
         } catch (err) {
             console.error('Failed to delete assignment rule:', err);
@@ -464,10 +446,7 @@ const Administration = () => {
         if (!window.confirm('Are you sure you want to delete this employee? Related data might be affected.')) return;
 
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-            await axios.delete(`/api/auth/users/${id}`, { headers });
+            await axios.delete(`/api/auth/users/${id}`);
             setUsers((prev) => prev.filter((u) => u.id !== id));
         } catch (err) {
             console.error('Failed to delete employee:', err);
@@ -479,10 +458,7 @@ const Administration = () => {
         if (!window.confirm('Are you sure you want to delete this team? Related data might be affected.')) return;
 
         try {
-            const token = sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-            await axios.delete(`/api/teams/${id}`, { headers });
+            await axios.delete(`/api/teams/${id}`);
             setTeams((prev) => prev.filter((t) => t.id !== id));
             fetchData(); // refresh users
         } catch (err) {
@@ -570,22 +546,19 @@ const Administration = () => {
                 const ws = wb.Sheets[wsname];
                 const importedData = XLSX.utils.sheet_to_json(ws);
 
-                const token = sessionStorage.getItem('token');
-                const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
                 if (activeTab === 'employees') {
                     const mappedUsers = importedData.map(row => ({
                         name: row.Name || row.name,
                         email: row.Email || row.email,
                         role: row.Role || row.role
                     }));
-                    await axios.post('/api/auth/users/bulk', { users: mappedUsers }, { headers });
+                    await axios.post('/api/auth/users/bulk', { users: mappedUsers });
                 } else if (activeTab === 'teams') {
                     // Assuming we have a bulk teams endpoint or we just loop
                     for (const row of importedData) {
                         const name = row.Name || row.name;
                         if (name) {
-                            await axios.post('/api/teams', { name }, { headers });
+                            await axios.post('/api/teams', { name });
                         }
                     }
                 } else {
@@ -595,7 +568,7 @@ const Administration = () => {
                         assignedUserId: row.AssignedUserId || row.assignedUserId,
                         teamId: row.TeamId || row.teamId
                     }));
-                    await axios.post('/api/customer-assignments/bulk', { rules: mappedRules }, { headers });
+                    await axios.post('/api/customer-assignments/bulk', { rules: mappedRules });
                 }
 
                 fetchData();

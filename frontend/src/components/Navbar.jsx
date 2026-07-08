@@ -31,10 +31,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchUsers = async () => {
     try {
-      const token = sessionStorage.getItem('token');
-      const response = await axios.get('/api/auth/users', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const response = await axios.get('/api/auth/users');
       setUsers(response.data.filter((u) => u.id !== user?.id));
     } catch (err) {
       console.error('Failed to load users for chat:', err);
@@ -43,10 +40,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchHistory = async (userId) => {
     try {
-      const token = sessionStorage.getItem('token');
-      const response = await axios.get(`/api/chat/messages/${userId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const response = await axios.get(`/api/chat/messages/${userId}`);
       setMessages(response.data);
     } catch (err) {
       console.error('Failed to load chat history:', err);
@@ -130,10 +124,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const token = sessionStorage.getItem('token');
-        const response = await axios.get(`/api/search?q=${encodeURIComponent(globalSearchQuery)}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const response = await axios.get(`/api/search?q=${encodeURIComponent(globalSearchQuery)}`);
         setSearchResults(response.data);
         setIsSearchOpen(true);
       } catch (err) {

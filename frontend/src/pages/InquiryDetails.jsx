@@ -62,13 +62,10 @@ const InquiryDetails = () => {
         if (!task.assignedUserId) return;
         setIsCreatingRule(true);
         try {
-            const token = sessionStorage.getItem('token');
             await axios.post('/api/assignments', {
                 customerName: task.customerName,
                 customerEmail: task.senderEmail,
                 assignedUserId: task.assignedUserId
-            }, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             alert('Default auto-assignment rule created successfully! Future emails from this sender will be assigned automatically.');
         } catch (error) {
@@ -81,10 +78,7 @@ const InquiryDetails = () => {
 
     const fetchTaskDetails = async () => {
         try {
-            const token = sessionStorage.getItem('token');
-            const response = await axios.get(`/api/tasks/${id}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
+            const response = await axios.get(`/api/tasks/${id}`);
             console.log(response.data, "task details");
             setTask(response.data);
         } catch (error) {
@@ -96,10 +90,7 @@ const InquiryDetails = () => {
 
     const fetchUsersList = async () => {
         try {
-            const token = sessionStorage.getItem('token');
-            const response = await axios.get('/api/auth/users', {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
+            const response = await axios.get('/api/auth/users');
             setUsers(response.data);
             dispatch(fetchGroups());
         } catch (error) {
@@ -109,10 +100,7 @@ const InquiryDetails = () => {
 
     const fetchTeamsList = async () => {
         try {
-            const token = sessionStorage.getItem('token');
-            const response = await axios.get('/api/teams', {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
+            const response = await axios.get('/api/teams');
             setTeams(response.data);
         } catch (error) {
             console.error('Failed to load teams:', error);
@@ -401,7 +389,7 @@ const InquiryDetails = () => {
                                                     {Math.round(file.fileSize / 1024)} KB
                                                 </span>
                                                 <a
-                                                    href={`/api/tasks/attachments/${file.id}/view?token=${sessionStorage.getItem('token') || ''}`}
+                                                    href={`/api/tasks/attachments/${file.id}/view`}
                                                     download={file.filename}
                                                     target="_blank"
                                                     rel="noreferrer"
@@ -629,7 +617,7 @@ const InquiryDetails = () => {
                                 Size: {Math.round(previewAttachment.fileSize / 1024)} KB | Type: {previewAttachment.fileType}
                             </span>
                             <a
-                                href={`/api/tasks/attachments/${previewAttachment.id}/view?token=${sessionStorage.getItem('token') || ''}`}
+                                href={`/api/tasks/attachments/${previewAttachment.id}/view`}
                                 download={previewAttachment.filename}
                                 target="_blank"
                                 rel="noreferrer"
@@ -709,7 +697,7 @@ const InquiryDetails = () => {
                                             {task.attachments.map((file) => (
                                                 <a
                                                     key={file.id}
-                                                    href={`/api/tasks/attachments/${file.id}/view?token=${sessionStorage.getItem('token') || ''}`}
+                                                    href={`/api/tasks/attachments/${file.id}/view`}
                                                     download={file.filename}
                                                     target="_blank"
                                                     rel="noreferrer"

@@ -29,6 +29,7 @@ describe('Auth Middleware', () => {
     req = {
       headers: {},
       query: {},
+      cookies: {},
     };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -86,6 +87,23 @@ describe('Auth Middleware', () => {
         message: 'Access token has expired.',
       });
       expect(next).not.toHaveBeenCalled();
+    });
+
+    test('should authenticate via cookie token if Authorization header is missing', async () => {
+      const token = jwt.sign({ id: 'user-123' }, process.env.JWT_SECRET);
+      req.cookies.token = token;
+
+      const cachedUser = { id: 'user-123', email: 'test@example.com', role: 'STAFF' };
+
+      getIsRedisAvailable.mockReturnValue(true);
+      getPubClient.mockReturnValue(mockRedisClient);
+      mockRedisClient.get.mockResolvedValue(JSON.stringify(cachedUser));
+
+      await authenticateToken(req, res, next);
+
+      expect(mockRedisClient.get).toHaveBeenCalledWith('user:user-123');
+      expect(req.user).toEqual(cachedUser);
+      expect(next).toHaveBeenCalled();
     });
 
     test('should authenticate user and pass to next() on Redis cache hit', async () => {

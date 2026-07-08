@@ -4,42 +4,32 @@ import { encrypt, decrypt } from '../utils/encryption';
 
 const AuthContext = createContext(null);
 
-const storedToken = sessionStorage.getItem('token');
-if (storedToken) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-}
+// Enable withCredentials globally so axios automatically sends and receives cookies
+axios.defaults.withCredentials = true;
+
+// Helper to extract a cookie by name
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(storedToken);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Synchronize axios defaults when token changes
-  useEffect(() => {
-    if (token) {
-      sessionStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      sessionStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
+  // Derive a dummy token value from user state to keep backward compatibility with the existing frontend
+  const token = user ? 'cookie-authenticated' : null;
 
-  // Load user profile on mount if token exists
+  // Load user profile on mount using the auth cookie
   useEffect(() => {
     const loadUser = async () => {
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
         const response = await axios.get('/api/auth/me');
         setUser(response.data);
       } catch (error) {
-        console.error('Failed to load user profile:', error.message);
-        // Token is invalid/expired
-        setToken(null);
+        console.log('No active session or session expired:', error.message);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -47,14 +37,23 @@ export const AuthProvider = ({ children }) => {
     };
 
     loadUser();
-  }, [token]);
+  }, []);
 
-  // Set up Axios interceptors for handling token expiration, refreshing, and encryption
+  // Set up Axios interceptors for encryption, token refresh, and CSRF protection
   useEffect(() => {
+    // Request interceptor: handles encryption and attaches CSRF token
     const requestInterceptor = axios.interceptors.request.use((config) => {
+      // 1. Attach client headers
       config.headers['x-client-device'] = 'mobile';
       config.headers['x-client-encrypted'] = 'true';
 
+      // 2. Attach CSRF token header for state-changing requests
+      const csrfToken = getCookie('csrfToken');
+      if (csrfToken && ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
+        config.headers['x-csrf-token'] = csrfToken;
+      }
+
+      // 3. Encrypt request data if applicable
       if (config.data && !(config.data instanceof FormData)) {
         try {
           const jsonStr = JSON.stringify(config.data);
@@ -80,6 +79,7 @@ export const AuthProvider = ({ children }) => {
       failedQueue = [];
     };
 
+    // Response interceptor: handles decryption and token rotation (401 token_expired)
     const responseInterceptor = axios.interceptors.response.use(
       (response) => {
         if (response.data && response.data.encryptedData) {
@@ -117,12 +117,10 @@ export const AuthProvider = ({ children }) => {
           !originalRequest._retry
         ) {
           if (isRefreshing) {
-            // Queue this request and wait for the refresh token call to finish
             return new Promise((resolve, reject) => {
               failedQueue.push({ resolve, reject });
             })
-              .then((newToken) => {
-                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+              .then(() => {
                 return axios(originalRequest);
               })
               .catch((err) => {
@@ -134,38 +132,15 @@ export const AuthProvider = ({ children }) => {
           isRefreshing = true;
 
           return new Promise((resolve, reject) => {
-            const storedRefreshToken = sessionStorage.getItem('refreshToken');
-
-            if (!storedRefreshToken) {
-              processQueue(new Error('No refresh token available'), null);
-              setToken(null);
-              setUser(null);
-              sessionStorage.removeItem('refreshToken');
-              reject(error);
-              isRefreshing = false;
-              return;
-            }
-
             axios
-              .post('/api/auth/refresh', { refreshToken: storedRefreshToken })
-              .then(({ data }) => {
-                const { token: newAccessToken, refreshToken: newRefreshToken } = data;
-
-                // Save new tokens
-                setToken(newAccessToken);
-                sessionStorage.setItem('refreshToken', newRefreshToken);
-
-                // Update authorization header and process queue
-                originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-                processQueue(null, newAccessToken);
-
+              .post('/api/auth/refresh')
+              .then(() => {
+                processQueue(null, 'refreshed');
                 resolve(axios(originalRequest));
               })
               .catch((refreshError) => {
                 processQueue(refreshError, null);
-                setToken(null);
                 setUser(null);
-                sessionStorage.removeItem('refreshToken');
                 reject(refreshError);
               })
               .then(() => {
@@ -188,9 +163,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     try {
       const response = await axios.post('/api/auth/login', { email, password });
-      const { token: receivedToken, refreshToken: receivedRefreshToken, user: receivedUser } = response.data;
-      sessionStorage.setItem('refreshToken', receivedRefreshToken);
-      setToken(receivedToken);
+      const { user: receivedUser } = response.data;
       setUser(receivedUser);
       return { success: true };
     } catch (error) {
@@ -221,13 +194,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    const storedRefreshToken = sessionStorage.getItem('refreshToken');
-    if (storedRefreshToken) {
-      axios.post('/api/auth/logout', { refreshToken: storedRefreshToken }).catch(() => { });
+    try {
+      await axios.post('/api/auth/logout');
+    } catch (err) {
+      console.error('Logout request failed:', err.message);
+    } finally {
+      setUser(null);
     }
-    setToken(null);
-    setUser(null);
-    sessionStorage.removeItem('refreshToken');
   };
 
   return (

@@ -2,6 +2,7 @@
 process.env.JWT_SECRET = 'test-jwt-secret-key-32-chars-long';
 process.env.DATABASE_URL = 'postgresql://test@localhost:5432/db';
 process.env.MOBILE_ENCRYPTION_KEY = 'test-mobile-secret-key-32-chars-long';
+process.env.CSRF_SECRET = 'test-csrf-secret-key-32-chars-long';
 
 const request = require('supertest');
 const express = require('express');
@@ -41,6 +42,7 @@ describe('Auth Controller & Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     app = express();
+    app.use(require('cookie-parser')());
     app.use(express.json());
     app.use('/api/auth', authRoutes);
   });
@@ -151,7 +153,12 @@ describe('Auth Controller & Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('token');
       expect(response.body).toHaveProperty('refreshToken');
+      expect(response.body).toHaveProperty('csrfToken');
       expect(response.body.user.email).toBe(user.email);
+      expect(response.headers['set-cookie']).toBeDefined();
+      expect(response.headers['set-cookie'].some(c => c.includes('token='))).toBe(true);
+      expect(response.headers['set-cookie'].some(c => c.includes('refreshToken='))).toBe(true);
+      expect(response.headers['set-cookie'].some(c => c.includes('csrfToken='))).toBe(true);
     });
 
     test('should reject login for invalid credentials (incorrect password)', async () => {
