@@ -59,23 +59,22 @@ const authenticateToken = async (req, res, next) => {
     const redisClient = getPubClient();
 
     let user;
+    let cacheSuccess = false;
 
     if (redisClient && getIsRedisAvailable()) {
-      // Use Redis
-      const cached = await redisClient.get(`user:${decoded.id}`);
-      if (cached) {
-        user = JSON.parse(cached);
-      } else {
-        user = await prisma.user.findUnique({
-          where: { id: decoded.id },
-          select: { id: true, email: true, name: true, role: true, teams: true }
-        });
-        if (user) {
-          await redisClient.setEx(`user:${decoded.id}`, USER_CACHE_TTL_SEC, JSON.stringify(user));
+      try {
+        const cached = await redisClient.get(`user:${decoded.id}`);
+        if (cached) {
+          user = JSON.parse(cached);
+          cacheSuccess = true;
         }
+      } catch (err) {
+        console.error('[Auth Cache] Redis GET error, falling back to database/in-memory:', err.message);
       }
-    } else {
-      // Fallback to in-memory
+    }
+
+    if (!cacheSuccess) {
+      // Fallback to in-memory/database
       const cached = fallbackCache.get(decoded.id);
       if (cached && cached.expiresAt > Date.now()) {
         user = cached.user;
@@ -85,14 +84,28 @@ const authenticateToken = async (req, res, next) => {
           select: { id: true, email: true, name: true, role: true, teams: true }
         });
         if (user) {
+          if (redisClient && getIsRedisAvailable()) {
+            try {
+              await redisClient.setEx(`user:${decoded.id}`, USER_CACHE_TTL_SEC, JSON.stringify(user));
+            } catch (err) {
+              console.error('[Auth Cache] Redis SETEX error, falling back to in-memory only:', err.message);
+            }
+          }
           setInFallbackCache(decoded.id, user);
         }
       }
     }
 
     if (!user) {
-      if (redisClient && getIsRedisAvailable()) await redisClient.del(`user:${decoded.id}`);
-      else fallbackCache.delete(decoded.id);
+      if (redisClient && getIsRedisAvailable()) {
+        try {
+          await redisClient.del(`user:${decoded.id}`);
+        } catch (err) {
+          console.error('[Auth Cache] Redis DEL error:', err.message);
+        }
+      } else {
+        fallbackCache.delete(decoded.id);
+      }
       
       return res.status(403).json({ error: 'User account not found or has been disabled.' });
     }

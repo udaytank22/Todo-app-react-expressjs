@@ -189,6 +189,26 @@ describe('Auth Middleware', () => {
       jwt.verify = originalVerify;
     });
 
+    test('should fallback to database when Redis throws an error on GET', async () => {
+      const token = jwt.sign({ id: 'user-789' }, process.env.JWT_SECRET);
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      const dbUser = { id: 'user-789', email: 'test789@example.com', role: 'STAFF', name: 'User 789' };
+
+      getIsRedisAvailable.mockReturnValue(true);
+      getPubClient.mockReturnValue(mockRedisClient);
+      
+      // Redis get throws a connection closed error
+      mockRedisClient.get.mockRejectedValue(new Error('ClientClosedError: The client is closed'));
+      prisma.user.findUnique.mockResolvedValue(dbUser);
+
+      await authenticateToken(req, res, next);
+
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+      expect(req.user).toEqual(dbUser);
+      expect(next).toHaveBeenCalled();
+    });
+
     test('should return 403 if user does not exist in DB/cache', async () => {
       const token = jwt.sign({ id: 'non-existent' }, process.env.JWT_SECRET);
       req.headers['authorization'] = `Bearer ${token}`;
