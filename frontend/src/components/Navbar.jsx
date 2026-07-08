@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { MessageSquare, X, Send, ChevronLeft, Loader2 } from 'lucide-react';
+import { MessageSquare, X, Send, ChevronLeft, Loader2, Grid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange }) => {
@@ -31,7 +31,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get('/api/auth/users', {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -43,7 +43,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchHistory = async (userId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await axios.get(`/api/chat/messages/${userId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -130,7 +130,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await axios.get(`/api/search?q=${encodeURIComponent(globalSearchQuery)}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -166,7 +166,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
             placeholder="Search inquiries, customer, subject..."
             value={globalSearchQuery}
             onChange={(e) => setGlobalSearchQuery(e.target.value)}
-            onFocus={() => { if(globalSearchQuery && globalSearchQuery.trim().length > 0) setIsSearchOpen(true); }}
+            onFocus={() => { if (globalSearchQuery && globalSearchQuery.trim().length > 0) setIsSearchOpen(true); }}
             className="w-full bg-white/50 border border-black/5 rounded-xl px-2 py-1.5 text-sm outline-none transition-all focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/10 placeholder-slate-500 text-slate-800"
           />
           {isSearchOpen && (
@@ -249,11 +249,22 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
           )}
         </button>
 
+        {/* More Options Button */}
+        {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+          <button
+            onClick={() => navigate('/assignments')}
+            className="p-2 rounded-xl bg-white/50 border border-black/5 hover:bg-white/80 transition-all text-slate-600 hover:text-slate-900 cursor-pointer"
+            title="Settings & Reports"
+          >
+            <Grid className="h-4 w-4" />
+          </button>
+        )}
+
         {/* Direct Messages Drawer Modal */}
         {isChatOpen && (
           <>
             {/* Dark Backdrop overlay */}
-            <div 
+            <div
               className="fixed inset-0 bg-black/15 backdrop-blur-[2px] z-40 transition-opacity animate-in fade-in duration-200"
               onClick={() => setIsChatOpen(false)}
             />
@@ -296,11 +307,10 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
                           className={`flex flex-col ${isSelf ? 'items-end' : 'items-start'}`}
                         >
                           <div
-                            className={`px-3 py-1.5 text-xs max-w-[85%] rounded-2xl break-words leading-relaxed font-sans shadow-sm ${
-                              isSelf
+                            className={`px-3 py-1.5 text-xs max-w-[85%] rounded-2xl break-words leading-relaxed font-sans shadow-sm ${isSelf
                                 ? 'bg-blue-600 text-white rounded-tr-none'
                                 : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
-                            }`}
+                              }`}
                           >
                             {msg.content}
                           </div>

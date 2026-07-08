@@ -29,15 +29,30 @@ const initRedis = async () => {
       },
     });
 
+    pubClient.on('connect', () => {
+      console.log('[Redis] Socket connected.');
+    });
+
+    pubClient.on('ready', () => {
+      isRedisAvailable = true;
+      console.log('[Redis] Connection ready & ready to receive commands.');
+    });
+
+    pubClient.on('reconnecting', () => {
+      console.log('[Redis] Attempting to reconnect...');
+    });
+
     pubClient.on('error', (err) => {
       // Only log once Redis was previously working to avoid flooding the console
       if (isRedisAvailable) {
         console.warn('[Redis] Connection error:', err.message);
       }
+      isRedisAvailable = false;
     });
 
-    pubClient.on('reconnecting', () => {
-      console.log('[Redis] Attempting to reconnect...');
+    pubClient.on('end', () => {
+      console.warn('[Redis] Connection ended.');
+      isRedisAvailable = false;
     });
 
     await pubClient.connect();

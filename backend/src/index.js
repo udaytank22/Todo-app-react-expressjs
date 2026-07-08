@@ -1,4 +1,19 @@
 require('dotenv').config();
+
+// ── Startup Environment Validation ──────────────────────────────────────────
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'MOBILE_ENCRYPTION_KEY'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('==================================================');
+  console.error('  FATAL STARTUP ERROR: Missing Environment Variables');
+  console.error('  The following required variables are not set:');
+  missingEnvVars.forEach(varName => console.error(`    - ${varName}`));
+  console.error('  Please check your .env file or environment config.');
+  console.error('==================================================');
+  process.exit(1);
+}
+
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -22,6 +37,9 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const customerAssignmentRoutes = require('./routes/customerAssignmentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const groupRoutes = require('./routes/groupRoutes');
+const teamRoutes = require('./routes/teamRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const { prometheus, metricsMiddleware, checkHealth } = require('./utils/monitoring');
 const logger = require('./utils/logger');
 const encryptionMiddleware = require('./middleware/encryption');
@@ -30,8 +48,6 @@ const encryptionMiddleware = require('./middleware/encryption');
 // Utils / External services
 const { isConnected, fetchEmails } = require('./services/outlook');
 const { findAssignedUser } = require('./utils/assignmentEngine');
-const { startEmailSyncWorker, stopEmailSyncWorker } = require('./workers/emailSyncWorker');
-
 // ── App & Server ──────────────────────────────────────────────────────────────
 const app = express();
 const server = http.createServer(app);
@@ -80,26 +96,107 @@ const startServer = async () => {
   app.set('trust proxy', 1);
 
   // ── 5. Rate Limiting (Redis-backed or in-memory fallback) ───────────────
+  const { MemoryStore } = require('express-rate-limit');
+
   /**
-   * Build a rate limiter that uses the Redis store when Redis is connected,
-   * or falls back to the default in-memory store for single-instance use.
+   * Custom rate-limiting store wrapper that routes commands to RedisStore
+   * when Redis is connected and healthy, but falls back dynamically to
+   * MemoryStore on any connectivity error.
    */
-  const buildRateLimiter = (opts) => {
-    const redisClient = getPubClient();
-    // Destructure out keyPrefix so it is never passed to express-rate-limit
-    // (express-rate-limit v8 does not accept it — it belongs in RedisStore only)
-    const { keyPrefix, ...rateLimitOpts } = opts;
-    if (redisClient && getIsRedisAvailable()) {
-      return rateLimit({
-        ...rateLimitOpts,
-        store: new RedisStore({
-          sendCommand: (...args) => redisClient.sendCommand(args),
-          prefix: keyPrefix || 'rl:',
-        }),
-      });
+  class FallbackRedisStore {
+    constructor(redisStoreOpts) {
+      this.redisStore = new RedisStore(redisStoreOpts);
+      this.memoryStore = new MemoryStore();
     }
-    // In-memory fallback (works per-process — fine for single instance)
-    return rateLimit(rateLimitOpts);
+
+    init(options) {
+      this.redisStore.init(options);
+      this.memoryStore.init(options);
+    }
+
+    async get(key) {
+      if (getIsRedisAvailable()) {
+        try {
+          return await this.redisStore.get(key);
+        } catch (err) {
+          console.error('[RateLimit] Redis get error, falling back to MemoryStore:', err.message);
+        }
+      }
+      return await this.memoryStore.get(key);
+    }
+
+    async increment(key) {
+      if (getIsRedisAvailable()) {
+        try {
+          return await this.redisStore.increment(key);
+        } catch (err) {
+          console.error('[RateLimit] Redis increment error, falling back to MemoryStore:', err.message);
+        }
+      }
+      return await this.memoryStore.increment(key);
+    }
+
+    async decrement(key) {
+      if (getIsRedisAvailable()) {
+        try {
+          return await this.redisStore.decrement(key);
+        } catch (err) {
+          console.error('[RateLimit] Redis decrement error, falling back to MemoryStore:', err.message);
+        }
+      }
+      return await this.memoryStore.decrement(key);
+    }
+
+    async resetKey(key) {
+      if (getIsRedisAvailable()) {
+        try {
+          return await this.redisStore.resetKey(key);
+        } catch (err) {
+          console.error('[RateLimit] Redis resetKey error, falling back to MemoryStore:', err.message);
+        }
+      }
+      return await this.memoryStore.resetKey(key);
+    }
+
+    async resetAll() {
+      if (getIsRedisAvailable()) {
+        try {
+          return await this.redisStore.resetAll();
+        } catch (err) {
+          console.error('[RateLimit] Redis resetAll error, falling back to MemoryStore:', err.message);
+        }
+      }
+      return await this.memoryStore.resetAll();
+    }
+
+    shutdown() {
+      if (typeof this.redisStore.shutdown === 'function') {
+        this.redisStore.shutdown();
+      }
+      if (typeof this.memoryStore.shutdown === 'function') {
+        this.memoryStore.shutdown();
+      }
+    }
+  }
+
+  const buildRateLimiter = (opts) => {
+    const { keyPrefix, ...rateLimitOpts } = opts;
+    const redisClient = getPubClient();
+
+    const fallbackStore = new FallbackRedisStore({
+      sendCommand: async (...args) => {
+        if (!getIsRedisAvailable() || !redisClient) {
+          throw new Error('Redis is not connected');
+        }
+        return redisClient.sendCommand(args);
+      },
+      prefix: keyPrefix || 'rl:',
+    });
+
+    return rateLimit({
+      ...rateLimitOpts,
+      store: fallbackStore,
+    });
   };
 
   const apiLimiter = buildRateLimiter({
@@ -112,8 +209,8 @@ const startServer = async () => {
   });
 
   const authLimiter = buildRateLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
+    windowMs: 15 * 60 * 1000,  // 15 minutes
+    max: 10,                    // 10 attempts per window per IP
     standardHeaders: true,
     legacyHeaders: false,
     keyPrefix: 'rl:auth:',      // Only used by RedisStore prefix
@@ -139,11 +236,14 @@ const startServer = async () => {
   app.use('/api/customer-assignments', customerAssignmentRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/search', searchRoutes);
+  app.use('/api/groups', groupRoutes);
+  app.use('/api/teams', teamRoutes);
+  app.use('/api/reports', reportRoutes);
 
   // --- Observability Endpoints ---
   app.get('/health', async (req, res) => {
     const checks = await checkHealth();
-    res.status(checks.status === 'OK' ? 200 : 503).json(checks);
+    res.status(checks.status === 'DOWN' ? 503 : 200).json(checks);
   });
 
   app.get('/metrics', async (req, res) => {
@@ -179,9 +279,6 @@ const startServer = async () => {
     console.log(`  Demo Mode   : ${process.env.DEMO_MODE === 'true' ? 'ACTIVE' : 'INACTIVE'}`);
     console.log(`  Redis       : ${getIsRedisAvailable() ? '✓ Connected' : '✗ Unavailable (in-memory fallback)'}`);
     console.log('==================================================');
-
-    // Start background email sync polling
-    startEmailSyncWorker();
   });
 
   // ── 12. Graceful Shutdown ────────────────────────────────────────────────
@@ -191,9 +288,6 @@ const startServer = async () => {
     // Stop accepting new HTTP connections
     server.close(async () => {
       console.log('[Server] HTTP server closed — no new connections accepted.');
-
-      // Stop polling emails
-      stopEmailSyncWorker();
 
       try {
         await prisma.$disconnect();

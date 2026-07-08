@@ -22,7 +22,7 @@ const loadConfig = async () => {
     const tokenRecord = await prisma.integrationToken.findUnique({
       where: { provider: 'outlook' }
     });
-    
+
     if (tokenRecord) {
       oauthConfig = {
         accessToken: tokenRecord.accessToken,
@@ -42,7 +42,7 @@ const loadConfig = async () => {
  */
 const saveConfig = async (config) => {
   oauthConfig = { ...oauthConfig, ...config };
-  
+
   try {
     const expiryTimeBigInt = oauthConfig.expiryTime ? BigInt(oauthConfig.expiryTime) : null;
     await prisma.integrationToken.upsert({
@@ -125,7 +125,8 @@ const exchangeAuthCode = async (code) => {
     return true;
   } catch (error) {
     console.error('Error exchanging auth code:', error.response?.data || error.message);
-    throw new Error('Failed to exchange auth token with Microsoft.');
+    const details = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+    throw new Error('Failed to exchange auth token with Microsoft. Details: ' + details);
   }
 };
 

@@ -33,7 +33,7 @@ const List = ({ socket, searchVal }) => {
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [itemsPerPage, setItemsPerPage] = useState(100);
     const [isPaginationOpen, setIsPaginationOpen] = useState(false);
     const paginationDropdownRef = React.useRef(null);
 
@@ -189,6 +189,9 @@ const List = ({ socket, searchVal }) => {
                         {/* Headers */}
                         <thead className="bg-white/80 border-b border-black/5 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                             <tr>
+                                <th className="px-4 py-1 select-none text-center w-16">
+                                    <span>Sr No</span>
+                                </th>
                                 <th className="px-4 py-1 cursor-pointer select-none" onClick={() => handleSort('subject')}>
                                     <div className="flex items-center gap-1.5">
                                         <span>Subject</span>
@@ -213,6 +216,7 @@ const List = ({ socket, searchVal }) => {
                                         <ArrowUpDown className="h-3 w-3" />
                                     </div>
                                 </th>
+
                                 <th className="px-4 py-1 cursor-pointer select-none" onClick={() => handleSort('assignedUser')}>
                                     <div className="flex items-center gap-1.5">
                                         <span>Assigned To</span>
@@ -231,8 +235,11 @@ const List = ({ socket, searchVal }) => {
 
                         {/* Body */}
                         <tbody className="divide-y divide-black/5 text-sm">
-                            {currentTasks.map((task) => (
+                            {currentTasks.map((task, index) => (
                                 <tr key={task.id} className="table-row-hover text-slate-700 light:text-slate-700">
+                                    <td className="px-4 py-2 font-semibold text-slate-500 text-center w-16">
+                                        {indexOfFirstItem + index + 1}
+                                    </td>
                                     <td className="px-4 py-2 font-semibold text-slate-900 max-w-xs truncate w-[20%]">
                                         <Link to={`/inquiry/${task.id}`} className="hover:text-sky-400 hover:underline transition-colors cursor-pointer block truncate">
                                             {task.subject}
@@ -247,9 +254,10 @@ const List = ({ socket, searchVal }) => {
                                     <td className="px-4 py-2 w-[10%]">
                                         <Badge value={task.priority} variant="priority" />
                                     </td>
+
                                     <td className="px-4 py-2 w-[15%]">
                                         <span className="font-semibold text-slate-800 light:text-slate-700 text-xs">
-                                            {task.assignedUser ? task.assignedUser.name : 'Unassigned'}
+                                            {task.assignedUser ? task.assignedUser.name : (task.team ? task.team.name : 'Unassigned')}
                                         </span>
                                     </td>
                                     <td className="px-4 py-2 text-slate-600 text-xs font-sans w-[10%]">
@@ -294,7 +302,7 @@ const List = ({ socket, searchVal }) => {
 
                                 {isPaginationOpen && (
                                     <div className="absolute bottom-full mb-1 left-0 w-full bg-white/90 backdrop-blur-md border border-slate-200/60 rounded-lg shadow-lg overflow-hidden z-50">
-                                        {[5, 10, 20, 50].map((option) => (
+                                        {[50, 100, 200].map((option) => (
                                             <button
                                                 key={option}
                                                 onClick={() => {

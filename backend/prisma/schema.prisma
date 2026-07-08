@@ -22,9 +22,13 @@ model User {
   sentMessages         DirectMessage[]       @relation("SentMessages")
   notifications        Notification[]        @relation("UserNotifications")
   archiveNotifications NotificationArchive[] @relation("UserArchiveNotifications")
-  refreshTokens        RefreshToken[]        @relation("UserRefreshTokens")
-  statusLogs           StatusHistory[]
-  tasksAssigned        Task[]                @relation("TaskAssignee")
+  customerAssignments CustomerAssignment[] @relation("CustomerAssignmentUser")
+  sentMessages        DirectMessage[]      @relation("SentMessages")
+  receivedMessages    DirectMessage[]      @relation("ReceivedMessages")
+  refreshTokens       RefreshToken[]       @relation("UserRefreshTokens")
+  teams               Team[]               @relation("UserTeams")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model Email {
@@ -41,33 +45,57 @@ model Email {
 }
 
 model Task {
-  id             String                   @id @default(uuid())
-  inquiryId      String                   @unique
-  subject        String
-  customerName   String
-  senderEmail    String
-  description    String
-  status         String
-  priority       String
-  dueDate        DateTime?
-  externalLink   String?
-  remarks        String?
-  aiSummary      String?
-  assignedUserId String?
-  emailId        String?                  @unique
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-  search_vector  Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(description, ''::text)) || ' '::text) || COALESCE(\"customerName\", ''::text)) || ' '::text) || COALESCE(\"senderEmail\", ''::text)) || ' '::text) || COALESCE(\"inquiryId\", ''::text)))"))
-  attachments    Attachment[]
-  comments       Comment[]
-  statusHistory  StatusHistory[]
-  assignedUser   User?                    @relation("TaskAssignee", fields: [assignedUserId], references: [id])
-  email          Email?                   @relation(fields: [emailId], references: [id])
+  id              String          @id @default(uuid())
+  inquiryId       String          @unique  // Custom counter e.g., "INQ-1001"
+  subject         String
+  customerName    String
+  senderEmail     String
+  description     String          @db.Text
+  status          String          // "PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"
+  priority        String          // "LOW", "MEDIUM", "HIGH", "URGENT"
+  dueDate         DateTime?
+  externalLink    String?
+  remarks         String?         @db.Text
+  aiSummary       String?         @db.Text
+  assignedUserId  String?
+  assignedUser    User?           @relation("TaskAssignee", fields: [assignedUserId], references: [id])
+  groupId         String?
+  group           TaskGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  teamId          String?
+  team            Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  emailId         String?         @unique
+  email           Email?          @relation(fields: [emailId], references: [id], onDelete: SetNull)
+  attachments     Attachment[]
+  comments        Comment[]
+  statusHistory   StatusHistory[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  search_vector   Unsupported("tsvector")? @default(dbgenerated())
 
   @@index([status])
   @@index([priority])
   @@index([assignedUserId])
+  @@index([groupId])
+  @@index([teamId])
   @@index([createdAt])
+}
+
+model TaskGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  users               User[]   @relation("UserTeams")
+  customerAssignments CustomerAssignment[]
+  tasks               Task[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Attachment {
@@ -158,13 +186,15 @@ model Counter {
 }
 
 model CustomerAssignment {
-  id             String   @id @default(uuid())
-  customerName   String?
-  customerEmail  String?
-  assignedUserId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  assignedUser   User     @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  customerName    String?
+  customerEmail   String?
+  assignedUserId  String?
+  assignedUser    User?    @relation("CustomerAssignmentUser", fields: [assignedUserId], references: [id], onDelete: Cascade)
+  teamId          String?
+  team            Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([customerName, customerEmail])
 }

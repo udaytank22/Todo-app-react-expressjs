@@ -64,7 +64,7 @@ const createAndEmitNotificationsBatch = async (userIds, type, title, message, re
  */
 const getAllTasks = async (req, res) => {
   const {
-    status, priority, search, customer, unassigned, date,
+    status, priority, search, customer, unassigned, date, group,
     sortBy = 'createdAt', sortOrder = 'desc',
     page = '1', limit = '50',
   } = req.query;
@@ -80,7 +80,15 @@ const getAllTasks = async (req, res) => {
     const where = {};
 
     if (req.user.role === 'STAFF') {
-      where.assignedUserId = req.user.id;
+      const userTeamIds = req.user.teams ? req.user.teams.map(t => t.id) : [];
+      where.AND = [
+        {
+          OR: [
+            { assignedUserId: req.user.id },
+            { teamId: { in: userTeamIds } }
+          ]
+        }
+      ];
     }
     if (status) {
       where.status = status.toUpperCase();
@@ -92,16 +100,27 @@ const getAllTasks = async (req, res) => {
       where.customerName = { contains: customer, mode: 'insensitive' };
     }
     if (search) {
-      where.OR = [
-        { subject: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { senderEmail: { contains: search, mode: 'insensitive' } },
-        { inquiryId: { contains: search, mode: 'insensitive' } },
-      ];
+      const searchOr = {
+        OR: [
+          { subject: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { customerName: { contains: search, mode: 'insensitive' } },
+          { senderEmail: { contains: search, mode: 'insensitive' } },
+          { inquiryId: { contains: search, mode: 'insensitive' } },
+        ]
+      };
+
+      if (where.AND) {
+        where.AND.push(searchOr);
+      } else {
+        where.AND = [searchOr];
+      }
     }
     if (unassigned === 'true') {
       where.assignedUserId = null;
+    }
+    if (group) {
+      where.groupId = group;
     }
     if (date) {
       const startOfDay = new Date(date);
@@ -140,74 +159,76 @@ const getAllTasks = async (req, res) => {
             where: { id: { in: emailIds } },
             select: { id: true },
           });
-        const existingTaskIds = new Set(existingTasks.map(t => t.id));
+          const existingTaskIds = new Set(existingTasks.map(t => t.id));
 
-        // Filter out emails that are already persisted
-        const unpersistedEmails = emails.filter(e => {
-          const hexId = Buffer.from(e.messageId).toString('hex');
-          return !existingTaskIds.has(hexId);
-        });
+          // Filter out emails that are already persisted
+          const unpersistedEmails = emails.filter(e => {
+            const hexId = Buffer.from(e.messageId).toString('hex');
+            return !existingTaskIds.has(hexId);
+          });
 
-        // Fetch assignment rules for dynamic live email assignments
-        const assignmentRules = await prismaRead.customerAssignment.findMany({
-          include: {
-            assignedUser: {
-              select: { id: true, name: true, email: true, role: true },
+          // Fetch assignment rules for dynamic live email assignments
+          const assignmentRules = await prismaRead.customerAssignment.findMany({
+            include: {
+              assignedUser: {
+                select: { id: true, name: true, email: true, role: true },
+              },
             },
-          },
-        });
+          });
 
-        liveEmails = unpersistedEmails.map((email, index) => {
-          const inqRegex = /INQ-\d+/i;
-          const subjectMatch = email.subject ? email.subject.match(inqRegex) : null;
-          const bodyMatch = email.body ? email.body.match(inqRegex) : null;
-          const inquiryId = subjectMatch ? subjectMatch[0].toUpperCase() : (bodyMatch ? bodyMatch[0].toUpperCase() : `INQ-LIVE-${index + 1}`);
+          liveEmails = unpersistedEmails.map((email, index) => {
+            const inqRegex = /INQ-\d+/i;
+            const subjectMatch = email.subject ? email.subject.match(inqRegex) : null;
+            const bodyMatch = email.body ? email.body.match(inqRegex) : null;
+            const inquiryId = subjectMatch ? subjectMatch[0].toUpperCase() : (bodyMatch ? bodyMatch[0].toUpperCase() : `INQ-LIVE-${index + 1}`);
 
-          let matchedRule = null;
-          const normalizedEmail = email.senderEmail ? email.senderEmail.trim().toLowerCase() : '';
-          const normalizedName = email.senderName ? email.senderName.trim().toLowerCase() : '';
+            let matchedRule = null;
+            const normalizedEmail = email.senderEmail ? email.senderEmail.trim().toLowerCase() : '';
+            const normalizedName = email.senderName ? email.senderName.trim().toLowerCase() : '';
 
-          for (const r of assignmentRules) {
-            if (r.customerEmail && r.customerEmail.toLowerCase() === normalizedEmail) {
-              matchedRule = r; break;
-            }
-          }
-          if (!matchedRule) {
             for (const r of assignmentRules) {
-              if (r.customerName && normalizedName.includes(r.customerName.toLowerCase())) {
+              if (r.customerEmail && normalizedEmail.includes(r.customerEmail.toLowerCase())) {
                 matchedRule = r; break;
               }
             }
-          }
-
-          return {
-            id: Buffer.from(email.messageId).toString('hex'),
-            inquiryId,
-            subject: email.subject,
-            customerName: email.senderName,
-            senderEmail: email.senderEmail,
-            description: email.body,
-            status: 'PENDING',
-            priority: 'MEDIUM',
-            dueDate: null,
-            externalLink: null,
-            remarks: null,
-            createdAt: email.receivedAt,
-            updatedAt: email.receivedAt,
-            assignedUserId: matchedRule ? matchedRule.assignedUserId : null,
-            assignedUser: matchedRule ? matchedRule.assignedUser : null,
-            _count: {
-              attachments: email.attachments ? email.attachments.length : 0,
-              comments: 0
+            if (!matchedRule) {
+              for (const r of assignmentRules) {
+                if (r.customerName && normalizedName.includes(r.customerName.toLowerCase())) {
+                  matchedRule = r; break;
+                }
+              }
             }
-          };
-        });
 
-        // Cache live emails for 30s
-        await cache.set('live_emails', liveEmails, 30);
-      } catch (err) {
-        console.error('Error fetching live emails in getAllTasks:', err.message);
-      }
+            return {
+              id: Buffer.from(email.messageId).toString('hex'),
+              inquiryId,
+              subject: email.subject,
+              customerName: email.senderName,
+              senderEmail: email.senderEmail,
+              description: email.body,
+              status: 'PENDING',
+              priority: 'MEDIUM',
+              dueDate: null,
+              externalLink: null,
+              remarks: null,
+              createdAt: email.receivedAt,
+              updatedAt: email.receivedAt,
+              assignedUserId: matchedRule ? matchedRule.assignedUserId : null,
+              assignedUser: matchedRule ? matchedRule.assignedUser : null,
+              teamId: matchedRule ? matchedRule.teamId : null,
+              team: matchedRule ? matchedRule.team : null,
+              _count: {
+                attachments: email.attachments ? email.attachments.length : 0,
+                comments: 0
+              }
+            };
+          });
+
+          // Cache live emails for 30s
+          await cache.set('live_emails', liveEmails, 30);
+        } catch (err) {
+          console.error('Error fetching live emails in getAllTasks:', err.message);
+        }
       }
     }
 
@@ -222,7 +243,7 @@ const getAllTasks = async (req, res) => {
     }
     if (search) {
       const q = search.toLowerCase();
-      liveEmails = liveEmails.filter(e => 
+      liveEmails = liveEmails.filter(e =>
         (e.subject && e.subject.toLowerCase().includes(q)) ||
         (e.description && e.description.toLowerCase().includes(q)) ||
         (e.customerName && e.customerName.toLowerCase().includes(q)) ||
@@ -232,6 +253,9 @@ const getAllTasks = async (req, res) => {
     }
     if (unassigned === 'true') {
       liveEmails = liveEmails.filter(e => e.assignedUserId === null);
+    }
+    if (group) {
+      liveEmails = []; // Live emails don't have groups yet
     }
     if (date) {
       const startOfDay = new Date(date).setUTCHours(0, 0, 0, 0);
@@ -258,6 +282,9 @@ const getAllTasks = async (req, res) => {
         include: {
           assignedUser: {
             select: { id: true, name: true, email: true, role: true },
+          },
+          team: {
+            select: { id: true, name: true },
           },
           _count: {
             select: { attachments: true, comments: true },
@@ -327,7 +354,10 @@ const getTaskById = async (req, res) => {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
         },
-        attachments: true,
+        group: true,
+        attachments: {
+          orderBy: { createdAt: 'desc' },
+        },
         email: true,
         comments: {
           include: {
@@ -371,16 +401,16 @@ const getTaskById = async (req, res) => {
 
       const matchedEmail = emails.find(e => e.messageId === decodedId);
       if (matchedEmail) {
-        const matchedUserId = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
-        
-        if (req.user.role === 'STAFF' && matchedUserId !== req.user.id) {
+        const assignmentMatch = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
+
+        if (req.user.role === 'STAFF' && (!assignmentMatch || assignmentMatch.assignedUserId !== req.user.id)) {
           return res.status(403).json({ error: 'Access Denied: You are not authorized to view this inquiry.' });
         }
 
         let assignedUserObj = null;
-        if (matchedUserId) {
+        if (assignmentMatch && assignmentMatch.assignedUserId) {
           assignedUserObj = await prismaRead.user.findUnique({
-            where: { id: matchedUserId },
+            where: { id: assignmentMatch.assignedUserId },
             select: { id: true, name: true, email: true, role: true },
           });
         }
@@ -400,7 +430,8 @@ const getTaskById = async (req, res) => {
           aiSummary: null,
           createdAt: matchedEmail.receivedAt,
           updatedAt: matchedEmail.receivedAt,
-          assignedUserId: matchedUserId || null,
+          assignedUserId: assignmentMatch ? assignmentMatch.assignedUserId : null,
+          groupId: assignmentMatch ? assignmentMatch.groupId : null,
           assignedUser: assignedUserObj || null,
           attachments: matchedEmail.attachments ? matchedEmail.attachments.map((att) => ({
             id: Buffer.from(JSON.stringify({ m: matchedEmail.messageId, a: att.id })).toString('hex'),
@@ -426,7 +457,7 @@ const getTaskById = async (req, res) => {
  * Create a task/inquiry manually
  */
 const createTask = async (req, res) => {
-  const { subject, customerName, senderEmail, description, status, priority, dueDate, externalLink, remarks, assignedUserId } = req.body;
+  const { subject, customerName, senderEmail, description, status, priority, dueDate, externalLink, remarks, assignedUserId, groupId } = req.body;
 
   if (!subject || !customerName || !description) {
     return res.status(400).json({ error: 'Subject, Customer Name, and Description are required.' });
@@ -437,8 +468,13 @@ const createTask = async (req, res) => {
 
     // Auto-assign if rule matches and no assignee is provided manually
     let finalAssignedUserId = assignedUserId || null;
-    if (!finalAssignedUserId && senderEmail) {
-      finalAssignedUserId = await findAssignedUser(senderEmail, customerName);
+    let finalGroupId = groupId || null;
+    if (!finalAssignedUserId && !finalGroupId && senderEmail) {
+      const assignmentMatch = await findAssignedUser(senderEmail, customerName);
+      if (assignmentMatch) {
+        finalAssignedUserId = assignmentMatch.assignedUserId;
+        finalGroupId = assignmentMatch.groupId;
+      }
     }
 
     const task = await prisma.task.create({
@@ -454,11 +490,13 @@ const createTask = async (req, res) => {
         externalLink: externalLink || null,
         remarks: remarks || null,
         assignedUserId: finalAssignedUserId,
+        groupId: finalGroupId,
       },
       include: {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
         },
+        group: true,
       },
     });
 
@@ -476,15 +514,32 @@ const createTask = async (req, res) => {
 
     // Create persistent notifications
     try {
+      let recipientIds = [];
       if (task.assignedUserId && task.assignedUserId !== req.user.id) {
-        await createAndEmitNotification(
-          task.assignedUserId,
+        recipientIds.push(task.assignedUserId);
+      }
+      if (task.teamId) {
+        const teamMembers = await prisma.user.findMany({
+          where: { teams: { some: { id: task.teamId } } },
+          select: { id: true }
+        });
+        teamMembers.forEach(member => {
+          if (member.id !== req.user.id && !recipientIds.includes(member.id)) {
+            recipientIds.push(member.id);
+          }
+        });
+      }
+
+      if (recipientIds.length > 0) {
+        await createAndEmitNotificationsBatch(
+          recipientIds,
           'ASSIGNMENT',
           'New Inquiry Assigned',
           `You have been assigned inquiry ${task.inquiryId}: ${task.subject}`,
           task.id
         );
       }
+
       const adminsAndManagers = await prisma.user.findMany({
         where: {
           role: { in: ['ADMIN', 'MANAGER'] },
@@ -492,9 +547,9 @@ const createTask = async (req, res) => {
         },
         select: { id: true },
       });
-      const recipientIds = adminsAndManagers.map(r => r.id);
+      const adminRecipientIds = adminsAndManagers.map(r => r.id);
       await createAndEmitNotificationsBatch(
-        recipientIds,
+        adminRecipientIds,
         'NEW_INQUIRY',
         'New Inquiry Created',
         `New inquiry ${task.inquiryId} created by ${req.user.name}`,
@@ -569,7 +624,9 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
       const inquiryId = await generateInquiryId();
 
       // Auto-assign rule check on database persistence
-      const matchedUserId = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
+      const assignmentMatch = await findAssignedUser(matchedEmail.senderEmail, matchedEmail.senderName);
+      const targetAssigneeId = assignmentMatch ? assignmentMatch.assignedUserId : null;
+      const targetTeamId = assignmentMatch ? assignmentMatch.teamId : null;
 
       // Create Task record
       const newTask = await prisma.task.create({
@@ -583,22 +640,41 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
           status: 'PENDING',
           priority: 'MEDIUM',
           emailId: emailRecord.id,
-          assignedUserId: matchedUserId || null,
+          assignedUserId: targetAssigneeId,
+          teamId: targetTeamId,
           createdAt: matchedEmail.receivedAt,
           updatedAt: matchedEmail.receivedAt,
         }
       });
 
       // Notification for auto-assignment if matched
-      if (matchedUserId) {
+      if (targetAssigneeId || targetTeamId) {
         try {
-          await createAndEmitNotification(
-            matchedUserId,
-            'ASSIGNMENT',
-            'New Inquiry Automatically Assigned',
-            `You have been assigned inquiry ${newTask.inquiryId}: ${newTask.subject}`,
-            newTask.id
-          );
+          let recipientIds = [];
+          if (targetAssigneeId) {
+            recipientIds.push(targetAssigneeId);
+          }
+          if (targetTeamId) {
+            const teamMembers = await prisma.user.findMany({
+              where: { teams: { some: { id: targetTeamId } } },
+              select: { id: true }
+            });
+            teamMembers.forEach(member => {
+              if (member.id !== reqUser.id && !recipientIds.includes(member.id)) {
+                recipientIds.push(member.id);
+              }
+            });
+          }
+
+          if (recipientIds.length > 0) {
+            await createAndEmitNotificationsBatch(
+              recipientIds,
+              'ASSIGNMENT',
+              'New Inquiry Automatically Assigned',
+              `You have been assigned inquiry ${newTask.inquiryId}: ${newTask.subject}`,
+              newTask.id
+            );
+          }
         } catch (notifErr) {
           console.error('Failed to create assignment notification in ensureLiveEmailPersisted:', notifErr);
         }
@@ -662,7 +738,7 @@ const ensureLiveEmailPersisted = async (id, reqUser) => {
  */
 const updateTask = async (req, res) => {
   const { id } = req.params;
-  const { subject, customerName, senderEmail, description, status, priority, dueDate, externalLink, remarks, assignedUserId } = req.body;
+  const { subject, customerName, senderEmail, description, status, priority, dueDate, externalLink, remarks, assignedUserId, teamId } = req.body;
 
   try {
     // Ensure task exists in database (auto-persisting live email if needed)
@@ -684,8 +760,8 @@ const updateTask = async (req, res) => {
     }
 
     // Staff cannot change task assignment
-    if (assignedUserId !== undefined) {
-      const targetAssigneeId = assignedUserId || null;
+    if (assignedUserId !== undefined || teamId !== undefined) {
+      const targetAssigneeId = assignedUserId !== undefined ? (assignedUserId || null) : currentTask.assignedUserId;
       if (targetAssigneeId !== currentTask.assignedUserId) {
         if (req.user.role === 'STAFF') {
           return res.status(403).json({ error: 'Access Denied: Staff members are not authorized to change task assignment.' });
@@ -707,12 +783,14 @@ const updateTask = async (req, res) => {
         dueDate: dueDate ? new Date(dueDate) : undefined,
         externalLink,
         remarks,
-        assignedUserId: assignedUserId || null,
+        assignedUserId: assignedUserId !== undefined ? (assignedUserId || null) : undefined,
+        teamId: teamId !== undefined ? (teamId || null) : undefined,
       },
       include: {
         assignedUser: {
           select: { id: true, name: true, email: true, role: true },
         },
+        team: true,
         _count: {
           select: { attachments: true, comments: true },
         },
@@ -765,18 +843,38 @@ const updateTask = async (req, res) => {
 
     // Broadcast assignee change if it changed
     const targetAssigneeId = assignedUserId !== undefined ? (assignedUserId || null) : currentTask.assignedUserId;
-    if (targetAssigneeId !== currentTask.assignedUserId) {
+    const targetTeamId = teamId !== undefined ? (teamId || null) : currentTask.teamId;
+    
+    if (targetAssigneeId !== currentTask.assignedUserId || targetTeamId !== currentTask.teamId) {
+      let recipientIds = [];
+      if (targetAssigneeId && targetAssigneeId !== req.user.id) {
+        recipientIds.push(targetAssigneeId);
+      }
+      if (targetTeamId) {
+        const teamMembers = await prisma.user.findMany({
+          where: { teams: { some: { id: targetTeamId } } },
+          select: { id: true }
+        });
+        teamMembers.forEach(member => {
+          if (member.id !== req.user.id && !recipientIds.includes(member.id)) {
+            recipientIds.push(member.id);
+          }
+        });
+      }
+
       emitTaskAssigned({
         taskId: id,
         task: updatedTask,
-        assignedUserId: targetAssigneeId
+        assignedUserId: targetAssigneeId,
+        teamId: targetTeamId,
+        recipientIds
       });
 
       // Create notification for assignment
       try {
-        if (targetAssigneeId && targetAssigneeId !== req.user.id) {
-          await createAndEmitNotification(
-            targetAssigneeId,
+        if (recipientIds.length > 0) {
+          await createAndEmitNotificationsBatch(
+            recipientIds,
             'ASSIGNMENT',
             'New Inquiry Assigned',
             `You have been assigned inquiry ${updatedTask.inquiryId}: ${updatedTask.subject}`,
@@ -1170,7 +1268,7 @@ const parseAttachment = async (req, res) => {
       } catch (err) {
         return res.status(404).json({ error: 'File not found in storage.' });
       }
-      
+
       filename = attachment.filename;
       fileType = attachment.fileType;
     }
