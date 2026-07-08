@@ -1,3 +1,17 @@
+/**
+ * cleanDb.js — Wipe all data tables EXCEPT Users
+ *
+ * When to run:
+ *   After a staging/dev environment reset, or when you need to clear out
+ *   test data without losing user accounts.
+ *
+ * Usage:
+ *   node scripts/cleanDb.js
+ *
+ * WARNING: This is destructive — it deletes ALL rows from every table
+ *          except the User table. Do NOT run in production without
+ *          explicit confirmation.
+ */
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
