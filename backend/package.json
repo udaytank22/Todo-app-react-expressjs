@@ -9,7 +9,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "test": "jest --verbose --runInBand"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",
@@ -37,8 +38,10 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "jest": "^30.4.2",
     "nodemon": "^3.1.0",
-    "prisma": "^5.12.1"
+    "prisma": "^5.12.1",
+    "supertest": "^7.2.2"
   },
   "engines": {
     "node": ">=18.0.0"
