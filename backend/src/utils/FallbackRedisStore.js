@@ -9,16 +9,19 @@ class FallbackRedisStore {
   }
 
   init(options) {
-    // Catch initialization errors (like Redis connection refused) to prevent crashing on startup
-    if (typeof this.redisStore.init === 'function') {
-      const res = this.redisStore.init(options);
-      if (res && typeof res.catch === 'function') {
-        res.catch(err => {
-          console.warn('[RateLimit] Failed to initialize RedisStore on startup (using MemoryStore fallback):', err.message);
-        });
-      }
-    }
     this.memoryStore.init(options);
+    try {
+      if (typeof this.redisStore.init === 'function') {
+        const res = this.redisStore.init(options);
+        if (res && typeof res.catch === 'function') {
+          res.catch(err => {
+            console.error('[RateLimit] Redis init failed, will rely on in-memory fallback until Redis reconnects:', err.message);
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[RateLimit] Redis init failed, will rely on in-memory fallback until Redis reconnects:', err.message);
+    }
   }
 
   async get(key) {

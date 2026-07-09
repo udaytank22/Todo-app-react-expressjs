@@ -117,4 +117,32 @@ describe('FallbackRedisStore', () => {
     expect(res.status).toBe(200);
     expect(mockRedisStore.increment).toHaveBeenCalled();
   });
+
+  test('init does not throw and handles error if RedisStore.init throws synchronously', () => {
+    // Arrange: Redis is unreachable and its init throws synchronously
+    mockRedisStore.init.mockImplementation(() => {
+      throw new Error('Redis connection refused (synchronous)');
+    });
+
+    const store = new FallbackRedisStore({});
+    
+    // Act & Assert: Call init directly, and it should not throw
+    expect(() => store.init({})).not.toThrow();
+  });
+
+  test('init does not crash and handles promise rejection if RedisStore.init rejects', async () => {
+    // Arrange: Redis is unreachable and its init rejects asynchronously
+    let caughtRejection = false;
+    const rejectionPromise = Promise.reject(new Error('Redis connection refused (promise rejection)'));
+    rejectionPromise.catch(() => { caughtRejection = true; });
+    mockRedisStore.init.mockReturnValue(rejectionPromise);
+
+    const store = new FallbackRedisStore({});
+    
+    // Act & Assert: Call init directly, and it should not throw
+    expect(() => store.init({})).not.toThrow();
+    // Wait for the next tick to ensure any async handlers run
+    await new Promise(resolve => setImmediate(resolve));
+    expect(caughtRejection).toBe(true);
+  });
 });
