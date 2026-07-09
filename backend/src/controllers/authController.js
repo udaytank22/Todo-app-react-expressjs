@@ -122,7 +122,7 @@ const login = async (req, res) => {
       path: '/',
     };
     res.cookie('token', token, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
-    res.cookie('refreshToken', refreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, cookieOpts);
 
     const { generateCsrfToken } = require('../middleware/csrf');
     const csrfToken = generateCsrfToken(req, res);
@@ -260,7 +260,7 @@ const refresh = async (req, res) => {
       path: '/',
     };
     res.cookie('token', newAccessToken, { ...cookieOpts, maxAge: 15 * 60 * 1000 });
-    res.cookie('refreshToken', newRefreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('refreshToken', newRefreshToken, cookieOpts);
 
     const { generateCsrfToken } = require('../middleware/csrf');
     const csrfToken = generateCsrfToken(req, res);

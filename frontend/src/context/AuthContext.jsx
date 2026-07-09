@@ -77,11 +77,11 @@ export const AuthProvider = ({ children }) => {
       async (error) => {
         const originalRequest = error.config;
 
-        // Check if error is 401 token_expired and we haven't retried this request yet
+        // Check if error is 401 and we haven't retried this request yet, excluding refresh endpoint
         if (
           error.response &&
           error.response.status === 401 &&
-          error.response.data?.error === 'token_expired' &&
+          (!originalRequest.url || !originalRequest.url.includes('/api/auth/refresh')) &&
           !originalRequest._retry
         ) {
           if (isRefreshing) {
@@ -89,6 +89,7 @@ export const AuthProvider = ({ children }) => {
               failedQueue.push({ resolve, reject });
             })
               .then(() => {
+                originalRequest._retry = true;
                 return axios(originalRequest);
               })
               .catch((err) => {
@@ -101,7 +102,7 @@ export const AuthProvider = ({ children }) => {
 
           return new Promise((resolve, reject) => {
             axios
-              .post('/api/auth/refresh')
+              .post('/api/auth/refresh', {}, { withCredentials: true })
               .then(() => {
                 processQueue(null, 'refreshed');
                 resolve(axios(originalRequest));
