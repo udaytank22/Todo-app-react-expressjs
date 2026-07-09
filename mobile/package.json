@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@noble/ciphers": "^1.2.0",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native/new-app-screen": "0.86.0",
     "@react-navigation/bottom-tabs": "^7.18.2",
