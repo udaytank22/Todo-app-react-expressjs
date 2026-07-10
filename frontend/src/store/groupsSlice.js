@@ -1,13 +1,11 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { groupService } from '../services/groupService';
 
 // Fetch all groups
 export const fetchGroups = createAsyncThunk('groups/fetchGroups', async (_, { rejectWithValue }) => {
   try {
-    const response = await axios.get(`${API_URL}/groups`);
-    return response.data;
+    const data = await groupService.getGroups();
+    return data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to fetch groups');
   }
@@ -15,8 +13,8 @@ export const fetchGroups = createAsyncThunk('groups/fetchGroups', async (_, { re
 
 export const createGroup = createAsyncThunk('groups/createGroup', async (name, { rejectWithValue }) => {
   try {
-    const response = await axios.post(`${API_URL}/groups`, { name });
-    return response.data;
+    const data = await groupService.createGroup(name);
+    return data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to create group');
   }
@@ -24,8 +22,8 @@ export const createGroup = createAsyncThunk('groups/createGroup', async (name, {
 
 export const updateGroup = createAsyncThunk('groups/updateGroup', async ({ id, name }, { rejectWithValue }) => {
   try {
-    const response = await axios.put(`${API_URL}/groups/${id}`, { name });
-    return response.data;
+    const data = await groupService.updateGroup(id, name);
+    return data;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to update group');
   }
@@ -33,7 +31,7 @@ export const updateGroup = createAsyncThunk('groups/updateGroup', async ({ id, n
 
 export const deleteGroup = createAsyncThunk('groups/deleteGroup', async (id, { rejectWithValue }) => {
   try {
-    await axios.delete(`${API_URL}/groups/${id}`);
+    await groupService.deleteGroup(id);
     return id;
   } catch (error) {
     return rejectWithValue(error.response?.data?.error || 'Failed to delete group');

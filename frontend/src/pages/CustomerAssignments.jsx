@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import axios from 'axios';
+import { authService } from '../services/authService';
+import { groupService } from '../services/groupService';
+import { customerService } from '../services/customerService';
 import * as XLSX from 'xlsx';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -38,8 +40,8 @@ const ReportsView = () => {
     useEffect(() => {
         const fetchReports = async () => {
             try {
-                const res = await axios.get('/api/reports/dashboard');
-                setData(res.data);
+                const data = await customerService.getDashboardReports();
+                setData(data);
             } catch (err) {
                 console.error('Failed to fetch reports:', err);
             } finally {
@@ -264,15 +266,15 @@ const Administration = () => {
         setIsLoading(true);
         setError('');
         try {
-            const [rulesRes, usersRes, teamsRes] = await Promise.all([
-                axios.get('/api/customer-assignments'),
-                axios.get('/api/auth/users'),
-                axios.get('/api/teams')
+            const [rulesData, usersData, teamsData] = await Promise.all([
+                customerService.getRules(),
+                authService.getUsers(),
+                groupService.getTeams()
             ]);
 
-            setRules(rulesRes.data);
-            setUsers(usersRes.data);
-            setTeams(teamsRes.data);
+            setRules(rulesData);
+            setUsers(usersData);
+            setTeams(teamsData);
         } catch (err) {
             console.error('Failed to fetch data:', err);
             setError('Failed to load data.');
@@ -357,11 +359,11 @@ const Administration = () => {
             };
 
             if (editingId) {
-                const response = await axios.put(`/api/customer-assignments/${editingId}`, payload);
-                setRules((prev) => prev.map((r) => r.id === editingId ? response.data : r));
+                const responseData = await customerService.updateRule(editingId, payload);
+                setRules((prev) => prev.map((r) => r.id === editingId ? responseData : r));
             } else {
-                const response = await axios.post('/api/customer-assignments', payload);
-                setRules((prev) => [response.data, ...prev]);
+                const responseData = await customerService.createRule(payload);
+                setRules((prev) => [responseData, ...prev]);
             }
 
             setIsOpen(false);
@@ -394,11 +396,11 @@ const Administration = () => {
             }
 
             if (editingId) {
-                const response = await axios.put(`/api/auth/users/${editingId}`, payload);
-                setUsers((prev) => prev.map((u) => u.id === editingId ? response.data : u));
+                const responseData = await authService.updateUser(editingId, payload);
+                setUsers((prev) => prev.map((u) => u.id === editingId ? responseData : u));
             } else {
-                const response = await axios.post('/api/auth/users', payload);
-                setUsers((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
+                const responseData = await authService.createUser(payload);
+                setUsers((prev) => [...prev, responseData].sort((a, b) => a.name.localeCompare(b.name)));
             }
 
             setIsOpen(false);
@@ -422,11 +424,11 @@ const Administration = () => {
         setError('');
         try {
             if (editingId) {
-                const response = await axios.put(`/api/teams/${editingId}`, { name: teamForm.name });
-                setTeams((prev) => prev.map((t) => t.id === editingId ? response.data : t));
+                const responseData = await groupService.updateTeam(editingId, teamForm.name);
+                setTeams((prev) => prev.map((t) => t.id === editingId ? responseData : t));
             } else {
-                const response = await axios.post('/api/teams', { name: teamForm.name });
-                setTeams((prev) => [...prev, response.data].sort((a, b) => a.name.localeCompare(b.name)));
+                const responseData = await groupService.createTeam(teamForm.name);
+                setTeams((prev) => [...prev, responseData].sort((a, b) => a.name.localeCompare(b.name)));
             }
 
             setIsOpen(false);
@@ -467,13 +469,13 @@ const Administration = () => {
         setDeleteModal((prev) => ({ ...prev, isOpen: false }));
         try {
             if (type === 'rule') {
-                await axios.delete(`/api/customer-assignments/${id}`);
+                await customerService.deleteRule(id);
                 setRules((prev) => prev.filter((r) => r.id !== id));
             } else if (type === 'employee') {
-                await axios.delete(`/api/auth/users/${id}`);
+                await authService.deleteUser(id);
                 setUsers((prev) => prev.filter((u) => u.id !== id));
             } else if (type === 'team') {
-                await axios.delete(`/api/teams/${id}`);
+                await groupService.deleteTeam(id);
                 setTeams((prev) => prev.filter((t) => t.id !== id));
                 fetchData(); // refresh users
             }
@@ -580,13 +582,13 @@ const Administration = () => {
                         email: row.Email || row.email,
                         role: row.Role || row.role
                     }));
-                    await axios.post('/api/auth/users/bulk', { users: mappedUsers });
+                    await authService.bulkCreateUsers({ users: mappedUsers });
                 } else if (activeTab === 'teams') {
                     // Assuming we have a bulk teams endpoint or we just loop
                     for (const row of importedData) {
                         const name = row.Name || row.name;
                         if (name) {
-                            await axios.post('/api/teams', { name });
+                            await groupService.createTeam(name);
                         }
                     }
                 } else {
@@ -596,7 +598,7 @@ const Administration = () => {
                         assignedUserId: row.AssignedUserId || row.assignedUserId,
                         teamId: row.TeamId || row.teamId
                     }));
-                    await axios.post('/api/customer-assignments/bulk', { rules: mappedRules });
+                    await customerService.bulkCreateRules({ rules: mappedRules });
                 }
 
                 fetchData();

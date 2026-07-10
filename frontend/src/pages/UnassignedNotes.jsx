@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { taskService } from '../services/taskService';
 import { useAuth } from '../context/AuthContext';
 import { Loader, Calendar, StickyNote, Inbox, ExternalLink, CalendarDays } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -26,14 +26,12 @@ const UnassignedNotes = () => {
             setLoading(true);
             setError('');
             try {
-                const response = await axios.get(`/api/tasks`, {
-                    params: {
-                        unassigned: 'true',
-                        date: selectedDate,
-                        limit: 100 // fetch up to 100
-                    }
+                const data = await taskService.getTasks({
+                    unassigned: 'true',
+                    date: selectedDate,
+                    limit: 100 // fetch up to 100
                 });
-                setTasks(response.data.data || []);
+                setTasks(data.data || []);
             } catch (err) {
                 console.error("Failed to fetch unassigned tasks:", err);
                 setError('Failed to fetch unassigned notes.');

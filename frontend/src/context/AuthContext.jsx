@@ -1,18 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import { authService } from '../services/authService';
+import { setAuthFailureHandler } from '../services/apiClient';
 
 const AuthContext = createContext(null);
-
-// Enable withCredentials globally so axios automatically sends and receives cookies
-axios.defaults.withCredentials = true;
-
-// Helper to extract a cookie by name
-const getCookie = (name) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -25,8 +15,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const response = await axios.get('/api/auth/me');
-        setUser(response.data);
+        const data = await authService.getCurrentUser();
+        setUser(data);
       } catch (error) {
         console.log('No active session or session expired:', error.message);
         setUser(null);
@@ -38,101 +28,21 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  // Set up Axios interceptors for token refresh and CSRF protection
+  // Set up auth failure callback for response interceptor
   useEffect(() => {
-    // Request interceptor: attaches CSRF token and client headers
-    const requestInterceptor = axios.interceptors.request.use((config) => {
-      // 1. Attach client headers
-      config.headers['x-client-device'] = 'web';
-      config.headers['x-client-encrypted'] = 'false';
-
-      // 2. Attach CSRF token header for state-changing requests
-      const csrfToken = getCookie('csrfToken');
-      if (csrfToken && ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
-        config.headers['x-csrf-token'] = csrfToken;
-      }
-
-      return config;
+    setAuthFailureHandler(() => {
+      setUser(null);
     });
-
-    let isRefreshing = false;
-    let failedQueue = [];
-
-    const processQueue = (error, newToken = null) => {
-      failedQueue.forEach((prom) => {
-        if (error) {
-          prom.reject(error);
-        } else {
-          prom.resolve(newToken);
-        }
-      });
-      failedQueue = [];
-    };
-
-    // Response interceptor: handles token rotation (401 token_expired)
-    const responseInterceptor = axios.interceptors.response.use(
-      (response) => {
-        return response;
-      },
-      async (error) => {
-        const originalRequest = error.config;
-
-        // Check if error is 401 and we haven't retried this request yet, excluding refresh endpoint
-        if (
-          error.response &&
-          error.response.status === 401 &&
-          (!originalRequest.url || !originalRequest.url.includes('/api/auth/refresh')) &&
-          !originalRequest._retry
-        ) {
-          if (isRefreshing) {
-            return new Promise((resolve, reject) => {
-              failedQueue.push({ resolve, reject });
-            })
-              .then(() => {
-                originalRequest._retry = true;
-                return axios(originalRequest);
-              })
-              .catch((err) => {
-                return Promise.reject(err);
-              });
-          }
-
-          originalRequest._retry = true;
-          isRefreshing = true;
-
-          return new Promise((resolve, reject) => {
-            axios
-              .post('/api/auth/refresh', {}, { withCredentials: true })
-              .then(() => {
-                processQueue(null, 'refreshed');
-                resolve(axios(originalRequest));
-              })
-              .catch((refreshError) => {
-                processQueue(refreshError, null);
-                setUser(null);
-                reject(refreshError);
-              })
-              .then(() => {
-                isRefreshing = false;
-              });
-          });
-        }
-
-        return Promise.reject(error);
-      }
-    );
-
     return () => {
-      axios.interceptors.request.eject(requestInterceptor);
-      axios.interceptors.response.eject(responseInterceptor);
+      setAuthFailureHandler(null);
     };
   }, []);
 
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      const response = await axios.post('/api/auth/login', { email, password });
-      const { user: receivedUser } = response.data;
+      const data = await authService.login(email, password);
+      const { user: receivedUser } = data;
       setUser(receivedUser);
       return { success: true };
     } catch (error) {
@@ -149,7 +59,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password, role) => {
     setIsLoading(true);
     try {
-      await axios.post('/api/auth/register', { name, email, password, role });
+      await authService.register(name, email, password, role);
       return { success: true };
     } catch (error) {
       console.error('Registration request failed:', error.response?.data?.error || error.message);
@@ -164,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout');
+      await authService.logout();
     } catch (err) {
       console.error('Logout request failed:', err.message);
     } finally {
@@ -186,3 +96,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { authService } from '../services/authService';
+import { groupService } from '../services/groupService';
+import { customerService } from '../services/customerService';
+import { taskService } from '../services/taskService';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -62,7 +65,7 @@ const InquiryDetails = () => {
         if (!task.assignedUserId) return;
         setIsCreatingRule(true);
         try {
-            await axios.post('/api/assignments', {
+            await customerService.createRuleFromInquiry({
                 customerName: task.customerName,
                 customerEmail: task.senderEmail,
                 assignedUserId: task.assignedUserId
@@ -78,9 +81,9 @@ const InquiryDetails = () => {
 
     const fetchTaskDetails = async () => {
         try {
-            const response = await axios.get(`/api/tasks/${id}`);
-            console.log(response.data, "task details");
-            setTask(response.data);
+            const data = await taskService.getTask(id);
+            console.log(data, "task details");
+            setTask(data);
         } catch (error) {
             console.error('Failed to load task details:', error);
             alert('Failed to load inquiry details. It may have been deleted.');
@@ -90,8 +93,8 @@ const InquiryDetails = () => {
 
     const fetchUsersList = async () => {
         try {
-            const response = await axios.get('/api/auth/users');
-            setUsers(response.data);
+            const data = await authService.getUsers();
+            setUsers(data);
             dispatch(fetchGroups());
         } catch (error) {
             console.error('Failed to load users:', error);
@@ -100,8 +103,8 @@ const InquiryDetails = () => {
 
     const fetchTeamsList = async () => {
         try {
-            const response = await axios.get('/api/teams');
-            setTeams(response.data);
+            const data = await groupService.getTeams();
+            setTeams(data);
         } catch (error) {
             console.error('Failed to load teams:', error);
         }

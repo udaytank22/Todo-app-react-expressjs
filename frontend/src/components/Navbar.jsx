@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { authService } from '../services/authService';
+import { chatService } from '../services/chatService';
+import { searchService } from '../services/searchService';
 import { useAuth } from '../context/AuthContext';
 import { MessageSquare, X, Send, ChevronLeft, Loader2, Grid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -31,8 +33,8 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/auth/users');
-      setUsers(response.data.filter((u) => u.id !== user?.id));
+      const data = await authService.getUsers();
+      setUsers(data.filter((u) => u.id !== user?.id));
     } catch (err) {
       console.error('Failed to load users for chat:', err);
     }
@@ -40,8 +42,8 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
 
   const fetchHistory = async (userId) => {
     try {
-      const response = await axios.get(`/api/chat/messages/${userId}`);
-      setMessages(response.data);
+      const data = await chatService.getChatHistory(userId);
+      setMessages(data);
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
@@ -124,8 +126,8 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const response = await axios.get(`/api/search?q=${encodeURIComponent(globalSearchQuery)}`);
-        setSearchResults(response.data);
+        const data = await searchService.searchInquiries(globalSearchQuery);
+        setSearchResults(data);
         setIsSearchOpen(true);
       } catch (err) {
         console.error('Search error:', err);
