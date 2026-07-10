@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatTimeAgo } from '../utils/dateFormat';
 import { useSelector, useDispatch } from 'react-redux';
 import {
     fetchNotifications,
@@ -57,23 +58,7 @@ const Notifications = () => {
 
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
-    // Format timestamp helper
-    const formatTimeAgo = (dateString) => {
-        const now = new Date();
-        const past = new Date(dateString);
-        const diffMs = now - past;
-        const diffSec = Math.floor(diffMs / 1000);
-        const diffMin = Math.floor(diffSec / 60);
-        const diffHr = Math.floor(diffMin / 60);
-        const diffDays = Math.floor(diffHr / 24);
 
-        if (diffSec < 10) return 'Just now';
-        if (diffSec < 60) return `${diffSec}s ago`;
-        if (diffMin < 60) return `${diffMin}m ago`;
-        if (diffHr < 24) return `${diffHr}h ago`;
-        if (diffDays === 1) return 'Yesterday';
-        return past.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    };
 
     // Get icon for notification type
     const getIcon = (type) => {

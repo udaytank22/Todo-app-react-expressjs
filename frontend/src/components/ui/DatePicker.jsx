@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { formatDateDisplay } from '../../utils/dateFormat';
 
 const DatePicker = ({ value, onChange, className = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -90,11 +91,7 @@ const DatePicker = ({ value, onChange, className = '' }) => {
         setIsOpen(false);
     };
 
-    const formatDateDisplay = (dateString) => {
-        if (!dateString) return 'Select Date';
-        const [year, month, day] = dateString.split('-');
-        return `${day}-${month}-${year}`;
-    };
+
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 

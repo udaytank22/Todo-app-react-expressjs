@@ -3,6 +3,8 @@ import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import { searchService } from '../services/searchService';
 import { useAuth } from '../context/AuthContext';
+import { STATUS_COLORS } from '../utils/statusColors';
+import { formatTime } from '../utils/dateFormat';
 import { MessageSquare, X, Send, ChevronLeft, Loader2, Grid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -182,7 +184,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
                       <div className="text-sm font-semibold text-slate-800 truncate">{result.subject}</div>
                       <div className="text-xs text-slate-500 flex justify-between mt-1">
                         <span className="truncate max-w-[70%]">{result.customerName}</span>
-                        <span className="uppercase text-[9px] font-bold text-sky-500 bg-sky-50 px-1.5 py-0.5 rounded">{result.status}</span>
+                        <span className={`uppercase text-[9px] font-bold px-1.5 py-0.5 rounded ${STATUS_COLORS[result.status]?.navbar || 'text-sky-500 bg-sky-50'}`}>{result.status}</span>
                       </div>
                     </div>
                   ))}
@@ -308,10 +310,7 @@ const Navbar = ({ socket, isMailConnected, isDemoMode, searchVal, onSearchChange
                             {msg.content}
                           </div>
                           <span className="text-[8px] text-slate-400 font-sans mt-0.5 px-1">
-                            {new Date(msg.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {formatTime(msg.createdAt)}
                           </span>
                         </div>
                       );
