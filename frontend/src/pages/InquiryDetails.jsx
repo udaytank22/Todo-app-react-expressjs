@@ -663,94 +663,93 @@ const InquiryDetails = () => {
                 bodyClassName="flex-1 flex flex-col overflow-hidden h-full"
             >
                 <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => setIsFullScreen(false)}
-                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-                            >
-                                <ArrowLeft className="h-4 w-4" />
-                                Back to Details
-                            </button>
-                        </div>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setIsFullScreen(false)}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Details
+                        </button>
                     </div>
-                    <div className="flex-1 overflow-hidden flex bg-white">
-                        <div className="w-full h-full overflow-hidden flex flex-col md:flex-row">
-                            {/* Left Section: Headers & Attachments */}
-                            <div className="w-full md:w-[350px] lg:w-[400px] border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50/50 flex flex-col h-auto md:h-full overflow-y-auto p-6 flex-shrink-0">
-                                <h1 className="text-base font-bold text-slate-900 mb-6 leading-snug">{task.subject}</h1>
+                </div>
+                <div className="flex-1 overflow-hidden flex bg-white">
+                    <div className="w-full h-full overflow-hidden flex flex-col md:flex-row">
+                        {/* Left Section: Headers & Attachments */}
+                        <div className="w-full md:w-[350px] lg:w-[400px] border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50/50 flex flex-col h-auto md:h-full overflow-y-auto p-6 flex-shrink-0">
+                            <h1 className="text-base font-bold text-slate-900 mb-6 leading-snug">{task.subject}</h1>
 
-                                <div className="flex flex-col gap-4 mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-base flex-shrink-0">
-                                            {task.customerName ? task.customerName.charAt(0).toUpperCase() : task.senderEmail?.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="overflow-hidden">
-                                            <div className="font-bold text-sm text-slate-900 truncate">{task.customerName || task.senderEmail?.split('@')[0]}</div>
-                                            <div className="text-xs text-slate-500 truncate">
-                                                &lt;{task.senderEmail}&gt;
-                                            </div>
-                                        </div>
+                            <div className="flex flex-col gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-base flex-shrink-0">
+                                        {task.customerName ? task.customerName.charAt(0).toUpperCase() : task.senderEmail?.charAt(0).toUpperCase()}
                                     </div>
-
-                                    <div className="text-sm text-slate-600 flex flex-col gap-2 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                                        <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">To:</span> <span className="truncate">Support Team</span></div>
-                                        <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Cc:</span> <span>-</span></div>
-                                        <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Date:</span> <span>{formatDateTimeFull(task.createdAt)}</span></div>
+                                    <div className="overflow-hidden">
+                                        <div className="font-bold text-sm text-slate-900 truncate">{task.customerName || task.senderEmail?.split('@')[0]}</div>
+                                        <div className="text-xs text-slate-500 truncate">
+                                            &lt;{task.senderEmail}&gt;
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Attachments Section */}
-                                {(task.attachments?.length || 0) > 0 && (
-                                    <div className="mt-2">
-                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Attachments ({task.attachments.length})</h3>
-                                        <div className="flex flex-col gap-2">
-                                            {task.attachments.map((file) => (
-                                                <a
-                                                    key={file.id}
-                                                    href={`/api/tasks/attachments/${file.id}/view`}
-                                                    download={file.filename}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="flex items-center gap-3 p-2.5 pr-4 border border-slate-200 rounded-md hover:bg-white transition-colors cursor-pointer bg-slate-50/50 shadow-sm"
-                                                    title="Download attachment"
-                                                >
-                                                    <div className="bg-white border border-slate-100 p-2 rounded shadow-sm">
-                                                        {file.fileType === 'EXCEL' ? (
-                                                            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
-                                                        ) : file.fileType === 'PDF' ? (
-                                                            <FileText className="h-5 w-5 text-rose-600" />
-                                                        ) : (
-                                                            <FileText className="h-5 w-5 text-slate-500" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-col overflow-hidden">
-                                                        <span className="text-sm font-medium text-slate-700 truncate">
-                                                            {file.filename}
-                                                        </span>
-                                                        <span className="text-xs text-slate-500">
-                                                            {Math.round(file.fileSize / 1024)} KB
-                                                        </span>
-                                                    </div>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                <div className="text-sm text-slate-600 flex flex-col gap-2 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                                    <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">To:</span> <span className="truncate">Support Team</span></div>
+                                    <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Cc:</span> <span>-</span></div>
+                                    <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Date:</span> <span>{formatDateTimeFull(task.createdAt)}</span></div>
+                                </div>
                             </div>
 
-                            {/* Right Section: Email Body */}
-                            <div className="flex-1 p-6 md:p-8 text-sm text-slate-800 leading-relaxed font-sans bg-white overflow-y-auto h-full">
-                                {task.inquiryId?.includes('LIVE') || task.email?.body ? (
-                                    <div dangerouslySetInnerHTML={{ __html: task.inquiryId?.includes('LIVE') ? task.description : task.email.body }} />
-                                ) : (
-                                    <div className="whitespace-pre-wrap">{task.description}</div>
-                                )}
-                            </div>
+                            {/* Attachments Section */}
+                            {(task.attachments?.length || 0) > 0 && (
+                                <div className="mt-2">
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Attachments ({task.attachments.length})</h3>
+                                    <div className="flex flex-col gap-2">
+                                        {task.attachments.map((file) => (
+                                            <a
+                                                key={file.id}
+                                                href={`/api/tasks/attachments/${file.id}/view`}
+                                                download={file.filename}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="flex items-center gap-3 p-2.5 pr-4 border border-slate-200 rounded-md hover:bg-white transition-colors cursor-pointer bg-slate-50/50 shadow-sm"
+                                                title="Download attachment"
+                                            >
+                                                <div className="bg-white border border-slate-100 p-2 rounded shadow-sm">
+                                                    {file.fileType === 'EXCEL' ? (
+                                                        <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                                                    ) : file.fileType === 'PDF' ? (
+                                                        <FileText className="h-5 w-5 text-rose-600" />
+                                                    ) : (
+                                                        <FileText className="h-5 w-5 text-slate-500" />
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="text-sm font-medium text-slate-700 truncate">
+                                                        {file.filename}
+                                                    </span>
+                                                    <span className="text-xs text-slate-500">
+                                                        {Math.round(file.fileSize / 1024)} KB
+                                                    </span>
+                                                </div>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right Section: Email Body */}
+                        <div className="flex-1 p-6 md:p-8 text-sm text-slate-800 leading-relaxed font-sans bg-white overflow-y-auto h-full">
+                            {task.inquiryId?.includes('LIVE') || task.email?.body ? (
+                                <div dangerouslySetInnerHTML={{ __html: task.inquiryId?.includes('LIVE') ? task.description : task.email.body }} />
+                            ) : (
+                                <div className="whitespace-pre-wrap">{task.description}</div>
+                            )}
                         </div>
                     </div>
                 </div>
-            </Modal>
-        </div>
+            </Modal >
+        </div >
     );
 };
 
