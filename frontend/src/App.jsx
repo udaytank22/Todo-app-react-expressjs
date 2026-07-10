@@ -114,8 +114,13 @@ const AppContent = () => {
         const originalEmit = newSocket.emit;
         newSocket.emit = function(eventName, data, ...args) {
             if (data && typeof data === 'object' && !data.encryptedData) {
-                const encData = { encryptedData: encrypt(JSON.stringify(data)) };
-                return originalEmit.call(this, eventName, encData, ...args);
+                encrypt(JSON.stringify(data)).then(enc => {
+                    const encData = { encryptedData: enc };
+                    originalEmit.call(this, eventName, encData, ...args);
+                }).catch(err => {
+                    console.error('[Socket] Failed to encrypt data:', err);
+                });
+                return this;
             }
             return originalEmit.call(this, eventName, data, ...args);
         };
@@ -125,16 +130,22 @@ const AppContent = () => {
         newSocket.on = function(eventName, callback) {
             return originalOn.call(this, eventName, (data, ...args) => {
                 if (data && data.encryptedData) {
-                    const decryptedStr = decrypt(data.encryptedData);
-                    if (decryptedStr) {
-                        try {
-                            data = JSON.parse(decryptedStr);
-                        } catch (e) {
-                            data = decryptedStr;
+                    decrypt(data.encryptedData).then(decryptedStr => {
+                        if (decryptedStr) {
+                            try {
+                                data = JSON.parse(decryptedStr);
+                            } catch (e) {
+                                data = decryptedStr;
+                            }
                         }
-                    }
+                        callback(data, ...args);
+                    }).catch(err => {
+                        console.error('[Socket] Failed to decrypt data:', err);
+                        callback(data, ...args);
+                    });
+                } else {
+                    callback(data, ...args);
                 }
-                return callback(data, ...args);
             });
         };
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import Card from '../components/ui/Card';
@@ -229,6 +230,15 @@ const Administration = () => {
     const [editingId, setEditingId] = useState(null);
     const [assigneeType, setAssigneeType] = useState('employee'); // 'employee' | 'team'
 
+    // Delete Confirmation Modal State
+    const [deleteModal, setDeleteModal] = useState({
+        isOpen: false,
+        type: null,
+        id: null,
+        title: '',
+        message: ''
+    });
+
     // Form State - Assignments
     const [ruleForm, setRuleForm] = useState({
         customerName: '',
@@ -430,41 +440,59 @@ const Administration = () => {
         }
     };
 
-    const handleDeleteRule = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this auto-assignment rule?')) return;
+    const confirmDelete = (type, id) => {
+        let title = '';
+        let message = '';
+        if (type === 'rule') {
+            title = 'Delete Auto-Assignment Rule';
+            message = 'Are you sure you want to delete this auto-assignment rule?';
+        } else if (type === 'employee') {
+            title = 'Delete Employee';
+            message = 'Are you sure you want to delete this employee? Related data might be affected.';
+        } else if (type === 'team') {
+            title = 'Delete Team';
+            message = 'Are you sure you want to delete this team? Related data might be affected.';
+        }
+        setDeleteModal({
+            isOpen: true,
+            type,
+            id,
+            title,
+            message
+        });
+    };
 
+    const handleConfirmDelete = async () => {
+        const { type, id } = deleteModal;
+        setDeleteModal((prev) => ({ ...prev, isOpen: false }));
         try {
-            await axios.delete(`/api/customer-assignments/${id}`);
-            setRules((prev) => prev.filter((r) => r.id !== id));
+            if (type === 'rule') {
+                await axios.delete(`/api/customer-assignments/${id}`);
+                setRules((prev) => prev.filter((r) => r.id !== id));
+            } else if (type === 'employee') {
+                await axios.delete(`/api/auth/users/${id}`);
+                setUsers((prev) => prev.filter((u) => u.id !== id));
+            } else if (type === 'team') {
+                await axios.delete(`/api/teams/${id}`);
+                setTeams((prev) => prev.filter((t) => t.id !== id));
+                fetchData(); // refresh users
+            }
         } catch (err) {
-            console.error('Failed to delete assignment rule:', err);
-            alert('Error deleting rule: ' + (err.response?.data?.error || err.message));
+            console.error(`Failed to delete ${type}:`, err);
+            setError(err.response?.data?.error || `Failed to delete ${type}.`);
         }
     };
 
-    const handleDeleteEmployee = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this employee? Related data might be affected.')) return;
-
-        try {
-            await axios.delete(`/api/auth/users/${id}`);
-            setUsers((prev) => prev.filter((u) => u.id !== id));
-        } catch (err) {
-            console.error('Failed to delete employee:', err);
-            alert('Error deleting employee: ' + (err.response?.data?.error || err.message));
-        }
+    const handleDeleteRule = (id) => {
+        confirmDelete('rule', id);
     };
 
-    const handleDeleteTeam = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this team? Related data might be affected.')) return;
+    const handleDeleteEmployee = (id) => {
+        confirmDelete('employee', id);
+    };
 
-        try {
-            await axios.delete(`/api/teams/${id}`);
-            setTeams((prev) => prev.filter((t) => t.id !== id));
-            fetchData(); // refresh users
-        } catch (err) {
-            console.error('Failed to delete team:', err);
-            alert('Error deleting team: ' + (err.response?.data?.error || err.message));
-        }
+    const handleDeleteTeam = (id) => {
+        confirmDelete('team', id);
     };
 
     const fileInputRef = useRef(null);
@@ -1112,6 +1140,55 @@ const Administration = () => {
                         )}
                     </form>
                 </Modal>
+            )}
+            {/* Delete Confirmation Modal */}
+            {deleteModal.isOpen && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-[#18181b] w-full max-w-sm rounded-[24px] p-6 shadow-2xl border border-zinc-800/80 animate-scaleIn relative">
+                        {/* Close button */}
+                        <button
+                            onClick={() => setDeleteModal((prev) => ({ ...prev, isOpen: false }))}
+                            className="absolute top-6 right-6 text-zinc-400 hover:text-white transition-colors"
+                            aria-label="Close"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+
+                        {/* Icon */}
+                        <div className="w-10 h-10 bg-zinc-800 border border-zinc-700/50 rounded-full flex items-center justify-center text-rose-500">
+                            <Trash2 className="h-4.5 w-4.5" />
+                        </div>
+
+                        {/* Text Content */}
+                        <div className="mt-4">
+                            <h3 className="text-lg font-semibold text-white tracking-tight leading-snug">
+                                {deleteModal.title}
+                            </h3>
+                            <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
+                                {deleteModal.message} This action cannot be undone.
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setDeleteModal((prev) => ({ ...prev, isOpen: false }))}
+                                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#18181b] border border-zinc-800 rounded-full hover:bg-zinc-800 transition-all outline-none ring-2 ring-sky-500"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#dc3838] rounded-full hover:bg-red-600 transition-all outline-none"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );
