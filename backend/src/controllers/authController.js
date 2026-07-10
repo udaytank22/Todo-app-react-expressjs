@@ -99,7 +99,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email, name: user.name, role: user.role },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '10s' }
     );
 
     // Create secure refresh token (expires in 7 days)
@@ -235,7 +235,7 @@ const refresh = async (req, res) => {
     const newAccessToken = jwt.sign(
       { id: user.id, email: user.email, name: user.name, role: user.role },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '10s' }
     );
 
     // Rotate refresh token
