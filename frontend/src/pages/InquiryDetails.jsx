@@ -9,6 +9,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Dropdown from '../components/ui/Dropdown';
 import Modal from '../components/ui/Modal';
+import { formatDateTime, formatDateTimeFull } from '../utils/dateFormat';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateTask, addComment } from '../store/tasksSlice';
 import { fetchGroups } from '../store/groupsSlice';
@@ -335,7 +336,7 @@ const InquiryDetails = () => {
                             </div>
                             <span className="text-[12px] text-bold flex items-center gap-1.5 font-sans">
                                 <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                                {new Date(task.createdAt).toLocaleString()}
+                                {formatDateTime(task.createdAt)}
                             </span>
                         </div>
 
@@ -436,7 +437,7 @@ const InquiryDetails = () => {
                                                     <div className="flex items-center justify-between text-xs">
                                                         <span className="font-bold text-slate-800">{item.user?.name || 'Unknown User'}</span>
                                                         <span className="text-slate-500 text-[10px] font-sans">
-                                                            {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                                                            {formatDateTime(item.createdAt)}
                                                         </span>
                                                     </div>
                                                     <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-sans mt-1">
@@ -452,7 +453,7 @@ const InquiryDetails = () => {
                                                 <span className="font-sans">
                                                     Status updated from <span className="font-bold text-slate-600">{item.fromStatus}</span> to <span className="font-bold text-sky-400">{item.toStatus}</span>
                                                     {item.changedBy && ` by ${item.changedBy.name}`}
-                                                    {` on ${new Date(item.changedAt).toLocaleString()}`}
+                                                    {` on ${formatDateTime(item.changedAt)}`}
                                                 </span>
                                             </div>
                                         );
@@ -653,9 +654,15 @@ const InquiryDetails = () => {
             )}
 
             {/* Full Screen Email View */}
-            {isFullScreen && (
-                <div className="fixed inset-0 z-[100] bg-slate-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+            <Modal
+                isOpen={isFullScreen}
+                onClose={() => setIsFullScreen(false)}
+                size="full"
+                hideHeader={true}
+                className="bg-slate-100 flex flex-col"
+                bodyClassName="flex-1 flex flex-col overflow-hidden h-full"
+            >
+                <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={() => setIsFullScreen(false)}
@@ -688,7 +695,7 @@ const InquiryDetails = () => {
                                     <div className="text-sm text-slate-600 flex flex-col gap-2 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                                         <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">To:</span> <span className="truncate">Support Team</span></div>
                                         <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Cc:</span> <span>-</span></div>
-                                        <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Date:</span> <span>{new Date(task.createdAt).toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}</span></div>
+                                        <div className="flex gap-2"><span className="font-semibold text-slate-700 w-8 flex-shrink-0">Date:</span> <span>{formatDateTimeFull(task.createdAt)}</span></div>
                                     </div>
                                 </div>
 
@@ -742,7 +749,7 @@ const InquiryDetails = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

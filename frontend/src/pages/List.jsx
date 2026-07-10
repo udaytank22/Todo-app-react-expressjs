@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 import { Link } from 'react-router-dom';
+import { formatDateTime } from '../utils/dateFormat';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -261,7 +262,7 @@ const List = ({ socket, searchVal }) => {
                                         </span>
                                     </td>
                                     <td className="px-4 py-2 text-slate-600 text-xs font-sans w-[10%]">
-                                        {new Date(task.createdAt).toLocaleString()}
+                                        {formatDateTime(task.createdAt)}
                                     </td>
                                     <td className="px-4 py-2 w-[10%]">
                                         <div className="flex items-center justify-center gap-2">

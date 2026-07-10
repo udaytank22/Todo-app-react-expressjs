@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import DatePicker from '../components/ui/DatePicker';
 import Badge from '../components/ui/Badge';
+import { formatDate, formatTime } from '../utils/dateFormat';
 
 const UnassignedNotes = () => {
     const { token } = useAuth();
@@ -79,7 +80,7 @@ const UnassignedNotes = () => {
                     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
                         <Inbox className="h-16 w-16 mb-4 opacity-20" />
                         <h3 className="text-base font-bold text-slate-500">No unassigned inquiries</h3>
-                        <p className="text-sm mt-1">There are no unassigned inquiries for {new Date(selectedDate).toLocaleDateString()}.</p>
+                        <p className="text-sm mt-1">There are no unassigned inquiries for {formatDate(selectedDate)}.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -117,7 +118,7 @@ const UnassignedNotes = () => {
                                 </div>
 
                                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
-                                    <span>{new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>{formatTime(task.createdAt)}</span>
                                     <Badge value={task.status} variant="status" />
                                 </div>
                             </Card>

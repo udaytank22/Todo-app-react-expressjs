@@ -4,6 +4,7 @@ import { fetchGroups, createGroup, updateGroup, deleteGroup } from '../store/gro
 import { fetchTasks } from '../store/tasksSlice';
 import { Edit2, Trash2, Tag, Loader, Plus, Users, ChevronDown, ChevronUp, Mail, Info, Settings, ArrowRight, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { STATUS_COLORS } from '../utils/statusColors';
 
 const Groups = () => {
     const dispatch = useDispatch();
@@ -194,7 +195,7 @@ const Groups = () => {
                                                     {groupTasks.map(task => (
                                                         <Link key={task.id} to={`/inquiry/${task.id}`} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all group/task cursor-pointer">
                                                             <div className="flex items-center gap-3 overflow-hidden">
-                                                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${task.status === 'COMPLETED' ? 'bg-emerald-400' : task.status === 'IN_PROGRESS' ? 'bg-amber-400' : 'bg-slate-300'}`} />
+                                                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_COLORS[task.status]?.dot || 'bg-slate-300'}`} />
                                                                 <div className="flex flex-col truncate">
                                                                     <span className="text-sm font-semibold text-slate-800 truncate">{task.subject}</span>
                                                                     <span className="text-xs text-slate-500 truncate">{task.customerName || 'No customer'} • {task.priority} Priority</span>
