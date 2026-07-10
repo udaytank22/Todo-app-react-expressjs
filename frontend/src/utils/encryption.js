@@ -1,27 +1,61 @@
-import CryptoJS from 'crypto-js';
+const SECRET_KEY = import.meta.env.VITE_MOBILE_ENCRYPTION_KEY || 'default-mobile-secret-key-32-chars-long';
 
-const SECRET_KEY = import.meta.env.VITE_MOBILE_ENCRYPTION_KEY || 'default-mobile-secret-key-32-chars-long'; // Fallback for dev
+// Helper to convert hex string to Uint8Array
+const hexToBytes = (hex) => {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+};
 
-// Generate a 32-byte key from the secret key using SHA-256
-const getDerivedKey = () => {
-  return CryptoJS.SHA256(SECRET_KEY);
+// Helper to convert Uint8Array to hex string
+const bytesToHex = (bytes) => {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Derive key using SHA-256
+const getDerivedKey = async () => {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(SECRET_KEY);
+  const hash = await window.crypto.subtle.digest('SHA-256', keyData);
+  return await window.crypto.subtle.importKey(
+    'raw',
+    hash,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
 };
 
 /**
- * Encrypt cleartext string using AES-256-CBC
+ * Encrypt cleartext string using AES-256-GCM
  * @param {string} text - Cleartext to encrypt
- * @returns {string} - Combined string "iv_hex:encrypted_hex"
+ * @returns {Promise<string>} - Combined string "iv_hex:authTag_hex:ciphertext_hex"
  */
-export const encrypt = (text) => {
+export const encrypt = async (text) => {
   try {
-    const iv = CryptoJS.lib.WordArray.random(16);
-    const key = getDerivedKey();
-    const encrypted = CryptoJS.AES.encrypt(text, key, {
-      iv: iv,
-      mode: CryptoJS.mode.CBC,
-      padding: CryptoJS.pad.Pkcs7
-    });
-    return `${iv.toString(CryptoJS.enc.Hex)}:${encrypted.ciphertext.toString(CryptoJS.enc.Hex)}`;
+    const key = await getDerivedKey();
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encoder = new TextEncoder();
+    const encodedText = encoder.encode(text);
+    
+    // encrypt returns ciphertext concatenated with auth tag (16 bytes) at the end
+    const encryptedBuffer = await window.crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+        tagLength: 128
+      },
+      key,
+      encodedText
+    );
+    
+    const encryptedBytes = new Uint8Array(encryptedBuffer);
+    const ciphertextBytes = encryptedBytes.slice(0, -16);
+    const authTagBytes = encryptedBytes.slice(-16);
+    
+    return `${bytesToHex(iv)}:${bytesToHex(authTagBytes)}:${bytesToHex(ciphertextBytes)}`;
   } catch (error) {
     console.error('[Encryption] Encryption failed:', error.message);
     throw error;
@@ -29,31 +63,44 @@ export const encrypt = (text) => {
 };
 
 /**
- * Decrypt cipher text of format "iv_hex:encrypted_hex"
+ * Decrypt cipher text of format "iv_hex:authTag_hex:ciphertext_hex"
  * @param {string} encryptedText - Encrypted string to decrypt
- * @returns {string|null} - Decrypted cleartext or null if failed
+ * @returns {Promise<string|null>} - Decrypted cleartext or null if failed
  */
-export const decrypt = (encryptedText) => {
+export const decrypt = async (encryptedText) => {
   try {
     if (!encryptedText || !encryptedText.includes(':')) {
       return null;
     }
     const parts = encryptedText.split(':');
-    const iv = CryptoJS.enc.Hex.parse(parts[0]);
-    const ciphertext = CryptoJS.enc.Hex.parse(parts[1]);
+    if (parts.length < 3) {
+      console.error('[Encryption] Invalid ciphertext format: expected iv:authTag:ciphertext');
+      return null;
+    }
     
-    const key = getDerivedKey();
-    const cipherParams = CryptoJS.lib.CipherParams.create({
-      ciphertext: ciphertext
-    });
+    const ivBytes = hexToBytes(parts[0]);
+    const authTagBytes = hexToBytes(parts[1]);
+    const ciphertextBytes = hexToBytes(parts[2]);
     
-    const decrypted = CryptoJS.AES.decrypt(cipherParams, key, {
-      iv: iv,
-      mode: CryptoJS.mode.CBC,
-      padding: CryptoJS.pad.Pkcs7
-    });
+    const key = await getDerivedKey();
     
-    return decrypted.toString(CryptoJS.enc.Utf8);
+    // Concatenate ciphertext and auth tag for Web Crypto API
+    const combinedBytes = new Uint8Array(ciphertextBytes.length + authTagBytes.length);
+    combinedBytes.set(ciphertextBytes, 0);
+    combinedBytes.set(authTagBytes, ciphertextBytes.length);
+    
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: ivBytes,
+        tagLength: 128
+      },
+      key,
+      combinedBytes
+    );
+    
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedBuffer);
   } catch (error) {
     console.error('[Encryption] Decryption failed:', error.message);
     return null;

@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
-import { encrypt, decrypt } from '../utils/encryption';
 
 const AuthContext = createContext(null);
 
@@ -39,13 +38,13 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  // Set up Axios interceptors for encryption, token refresh, and CSRF protection
+  // Set up Axios interceptors for token refresh and CSRF protection
   useEffect(() => {
-    // Request interceptor: handles encryption and attaches CSRF token
+    // Request interceptor: attaches CSRF token and client headers
     const requestInterceptor = axios.interceptors.request.use((config) => {
       // 1. Attach client headers
-      config.headers['x-client-device'] = 'mobile';
-      config.headers['x-client-encrypted'] = 'true';
+      config.headers['x-client-device'] = 'web';
+      config.headers['x-client-encrypted'] = 'false';
 
       // 2. Attach CSRF token header for state-changing requests
       const csrfToken = getCookie('csrfToken');
@@ -53,15 +52,6 @@ export const AuthProvider = ({ children }) => {
         config.headers['x-csrf-token'] = csrfToken;
       }
 
-      // 3. Encrypt request data if applicable
-      if (config.data && !(config.data instanceof FormData)) {
-        try {
-          const jsonStr = JSON.stringify(config.data);
-          config.data = { encryptedData: encrypt(jsonStr) };
-        } catch (err) {
-          console.error('Failed to encrypt request data', err);
-        }
-      }
       return config;
     });
 
@@ -79,41 +69,19 @@ export const AuthProvider = ({ children }) => {
       failedQueue = [];
     };
 
-    // Response interceptor: handles decryption and token rotation (401 token_expired)
+    // Response interceptor: handles token rotation (401 token_expired)
     const responseInterceptor = axios.interceptors.response.use(
       (response) => {
-        if (response.data && response.data.encryptedData) {
-          try {
-            const decryptedStr = decrypt(response.data.encryptedData);
-            if (decryptedStr) {
-              response.data = JSON.parse(decryptedStr);
-            }
-          } catch (err) {
-            console.error('Failed to decrypt response data', err);
-          }
-        }
         return response;
       },
       async (error) => {
         const originalRequest = error.config;
 
-        // Decrypt error response if encrypted
-        if (error.response && error.response.data && error.response.data.encryptedData) {
-          try {
-            const decryptedStr = decrypt(error.response.data.encryptedData);
-            if (decryptedStr) {
-              error.response.data = JSON.parse(decryptedStr);
-            }
-          } catch (err) {
-            console.error('Failed to decrypt error response data', err);
-          }
-        }
-
-        // Check if error is 401 token_expired and we haven't retried this request yet
+        // Check if error is 401 and we haven't retried this request yet, excluding refresh endpoint
         if (
           error.response &&
           error.response.status === 401 &&
-          error.response.data?.error === 'token_expired' &&
+          (!originalRequest.url || !originalRequest.url.includes('/api/auth/refresh')) &&
           !originalRequest._retry
         ) {
           if (isRefreshing) {
@@ -121,6 +89,7 @@ export const AuthProvider = ({ children }) => {
               failedQueue.push({ resolve, reject });
             })
               .then(() => {
+                originalRequest._retry = true;
                 return axios(originalRequest);
               })
               .catch((err) => {
@@ -133,7 +102,7 @@ export const AuthProvider = ({ children }) => {
 
           return new Promise((resolve, reject) => {
             axios
-              .post('/api/auth/refresh')
+              .post('/api/auth/refresh', {}, { withCredentials: true })
               .then(() => {
                 processQueue(null, 'refreshed');
                 resolve(axios(originalRequest));

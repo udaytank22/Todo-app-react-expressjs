@@ -1,65 +1,63 @@
-
 import 'react-native-get-random-values';
 import CryptoJS from 'crypto-js';
+import { gcm } from '@noble/ciphers/aes';
 
-// Hardcoded default matching backend .env file.
-// In a real production build, this would be injected via react-native-config or similar.
 const SECRET_KEY = 'super_secure_mobile_encrypt_key_32_chars';
 
+// Helper to convert hex string to Uint8Array
+const hexToBytes = (hex) => {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+};
+
+// Helper to convert Uint8Array to hex string
+const bytesToHex = (bytes) => {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 const getDerivedKey = () => {
-  return CryptoJS.SHA256(SECRET_KEY);
+  const keyHash = CryptoJS.SHA256(SECRET_KEY);
+  return hexToBytes(CryptoJS.enc.Hex.stringify(keyHash));
+};
+
+const stringToBytes = (str) => {
+  const parsed = CryptoJS.enc.Utf8.parse(str);
+  return hexToBytes(CryptoJS.enc.Hex.stringify(parsed));
+};
+
+const bytesToString = (bytes) => {
+  const hex = bytesToHex(bytes);
+  const parsed = CryptoJS.enc.Hex.parse(hex);
+  return CryptoJS.enc.Utf8.stringify(parsed);
 };
 
 /**
- * Generate cryptographically secure random bytes if available, or fall back to Math.random
- */
-const generateRandomBytes = (size) => {
-  try {
-    const cryptoObj = (typeof global !== 'undefined' && global.crypto) || (typeof window !== 'undefined' && window.crypto);
-    if (cryptoObj && cryptoObj.getRandomValues) {
-      const array = new Uint8Array(size);
-      cryptoObj.getRandomValues(array);
-      const words = [];
-      for (let i = 0; i < size; i += 4) {
-        words.push(
-          (array[i] << 24) |
-          (array[i + 1] << 16) |
-          (array[i + 2] << 8) |
-          array[i + 3]
-        );
-      }
-      return CryptoJS.lib.WordArray.create(words, size);
-    }
-  } catch (err) {
-    console.warn('[Encryption] Failed to use secure random generator:', err.message);
-  }
-
-  // Fallback to Math.random (failsafe)
-  console.warn('[Encryption] Secure random values not available. Falling back to Math.random.');
-  const words = [];
-  for (let i = 0; i < size; i += 4) {
-    words.push((Math.random() * 0x100000000) | 0);
-  }
-  return CryptoJS.lib.WordArray.create(words, size);
-};
-
-/**
- * Encrypt cleartext string using AES-256-CBC
+ * Encrypt cleartext string using AES-256-GCM
  * @param {string} text - Cleartext string
- * @returns {string} - "iv_hex:encrypted_hex"
+ * @returns {string} - "iv_hex:authTag_hex:encrypted_hex"
  */
 export function encrypt(text) {
   try {
     const key = getDerivedKey();
-    const iv = generateRandomBytes(16);
-    const encrypted = CryptoJS.AES.encrypt(text, key, {
-      iv: iv,
-      mode: CryptoJS.mode.CBC,
-      padding: CryptoJS.pad.Pkcs7,
-    });
-    const ivHex = iv.toString(CryptoJS.enc.Hex);
-    const encryptedHex = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-    return `${ivHex}:${encryptedHex}`;
+    
+    // Generate a secure 12-byte IV (nonce) for GCM
+    const iv = global.crypto.getRandomValues(new Uint8Array(12));
+    
+    // Convert plaintext string to Uint8Array
+    const plaintextBytes = stringToBytes(text);
+    
+    // Encrypt
+    const aesGcm = gcm(key, iv);
+    const encryptedBytes = aesGcm.encrypt(plaintextBytes);
+    
+    // Extract ciphertext and auth tag (last 16 bytes)
+    const ciphertextBytes = encryptedBytes.slice(0, -16);
+    const authTagBytes = encryptedBytes.slice(-16);
+    
+    return `${bytesToHex(iv)}:${bytesToHex(authTagBytes)}:${bytesToHex(ciphertextBytes)}`;
   } catch (error) {
     console.error('[Encryption] Mobile encryption failed:', error.message);
     throw error;
@@ -67,7 +65,7 @@ export function encrypt(text) {
 }
 
 /**
- * Decrypt cipher text of format "iv_hex:encrypted_hex"
+ * Decrypt cipher text of format "iv_hex:authTag_hex:encrypted_hex"
  * @param {string} encryptedText - Encrypted string
  * @returns {string|null} - Decrypted cleartext or null
  */
@@ -77,23 +75,26 @@ export function decrypt(encryptedText) {
       return null;
     }
     const parts = encryptedText.split(':');
-    const ivHex = parts.shift();
-    const encryptedHex = parts.join(':');
+    if (parts.length < 3) {
+      console.error('[Encryption] Invalid ciphertext format: expected iv:authTag:ciphertext');
+      return null;
+    }
+
+    const ivBytes = hexToBytes(parts[0]);
+    const authTagBytes = hexToBytes(parts[1]);
+    const ciphertextBytes = hexToBytes(parts[2]);
 
     const key = getDerivedKey();
-    const iv = CryptoJS.enc.Hex.parse(ivHex);
-    const ciphertext = CryptoJS.enc.Hex.parse(encryptedHex);
 
-    const decrypted = CryptoJS.AES.decrypt(
-      { ciphertext: ciphertext },
-      key,
-      {
-        iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7,
-      }
-    );
-    return decrypted.toString(CryptoJS.enc.Utf8);
+    // Concatenate ciphertext and auth tag for decryption
+    const combinedBytes = new Uint8Array(ciphertextBytes.length + authTagBytes.length);
+    combinedBytes.set(ciphertextBytes, 0);
+    combinedBytes.set(authTagBytes, ciphertextBytes.length);
+
+    const aesGcm = gcm(key, ivBytes);
+    const decryptedBytes = aesGcm.decrypt(combinedBytes);
+    
+    return bytesToString(decryptedBytes);
   } catch (error) {
     console.error('[Encryption] Mobile decryption failed:', error.message);
     return null;

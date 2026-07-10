@@ -9,8 +9,19 @@ class FallbackRedisStore {
   }
 
   init(options) {
-    this.redisStore.init(options);
     this.memoryStore.init(options);
+    try {
+      if (typeof this.redisStore.init === 'function') {
+        const res = this.redisStore.init(options);
+        if (res && typeof res.catch === 'function') {
+          res.catch(err => {
+            console.error('[RateLimit] Redis init failed, will rely on in-memory fallback until Redis reconnects:', err.message);
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[RateLimit] Redis init failed, will rely on in-memory fallback until Redis reconnects:', err.message);
+    }
   }
 
   async get(key) {
