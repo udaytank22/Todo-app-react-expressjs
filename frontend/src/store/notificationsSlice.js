@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { notificationService } from '../services/notificationService';
+import { getErrorMessage } from '../utils/error';
 
 // 1. Async Thunks
 export const fetchNotifications = createAsyncThunk(
@@ -9,7 +10,7 @@ export const fetchNotifications = createAsyncThunk(
       const data = await notificationService.getNotifications(params);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to fetch notifications.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch notifications.'));
     }
   }
 );
@@ -21,7 +22,7 @@ export const markNotificationRead = createAsyncThunk(
       const data = await notificationService.markNotificationRead(id);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to mark notification as read.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to mark notification as read.'));
     }
   }
 );
@@ -33,7 +34,7 @@ export const markAllNotificationsRead = createAsyncThunk(
       const data = await notificationService.markAllNotificationsRead();
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to mark all notifications as read.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to mark all notifications as read.'));
     }
   }
 );

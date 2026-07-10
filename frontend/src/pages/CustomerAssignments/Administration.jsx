@@ -568,6 +568,7 @@ const Administration = ({ ReportsView }) => {
                                         <tr>
                                             <th className="px-6 py-3">Name</th>
                                             <th className="px-6 py-3">Email</th>
+                                            <th className="px-6 py-3">Team</th>
                                             <th className="px-6 py-3">Role</th>
                                             <th className="px-6 py-3 text-center">Actions</th>
                                         </tr>
@@ -590,6 +591,13 @@ const Administration = ({ ReportsView }) => {
                                                     <span className="flex items-center gap-2 font-sans text-xs">
                                                         <Mail className="h-4 w-4 text-slate-400" />
                                                         {u.email}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <span className="flex items-center gap-2 font-sans text-xs text-slate-600">
+                                                        {u.teams && u.teams.length > 0
+                                                            ? u.teams.map((t) => t.name).join(', ')
+                                                            : <span className="text-slate-400 italic">No Team</span>}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-3">

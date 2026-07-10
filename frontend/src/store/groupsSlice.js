@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { groupService } from '../services/groupService';
+import { getErrorMessage } from '../utils/error';
 
 // Fetch all groups
 export const fetchGroups = createAsyncThunk('groups/fetchGroups', async (_, { rejectWithValue }) => {
@@ -7,7 +8,7 @@ export const fetchGroups = createAsyncThunk('groups/fetchGroups', async (_, { re
     const data = await groupService.getGroups();
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.error || 'Failed to fetch groups');
+    return rejectWithValue(getErrorMessage(error, 'Failed to fetch groups'));
   }
 });
 
@@ -16,7 +17,7 @@ export const createGroup = createAsyncThunk('groups/createGroup', async (name, {
     const data = await groupService.createGroup(name);
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.error || 'Failed to create group');
+    return rejectWithValue(getErrorMessage(error, 'Failed to create group'));
   }
 });
 
@@ -25,7 +26,7 @@ export const updateGroup = createAsyncThunk('groups/updateGroup', async ({ id, n
     const data = await groupService.updateGroup(id, name);
     return data;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.error || 'Failed to update group');
+    return rejectWithValue(getErrorMessage(error, 'Failed to update group'));
   }
 });
 
@@ -34,7 +35,7 @@ export const deleteGroup = createAsyncThunk('groups/deleteGroup', async (id, { r
     await groupService.deleteGroup(id);
     return id;
   } catch (error) {
-    return rejectWithValue(error.response?.data?.error || 'Failed to delete group');
+    return rejectWithValue(getErrorMessage(error, 'Failed to delete group'));
   }
 });
 
