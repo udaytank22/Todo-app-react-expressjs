@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { taskService } from '../services/taskService';
+import { getErrorMessage } from '../utils/error';
 
 // 1. Async Thunks
 export const fetchTasks = createAsyncThunk(
@@ -9,7 +10,7 @@ export const fetchTasks = createAsyncThunk(
       const data = await taskService.getTasks(params);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to fetch tasks.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch tasks.'));
     }
   }
 );
@@ -21,7 +22,7 @@ export const updateTaskStatus = createAsyncThunk(
       const data = await taskService.updateTaskStatus(id, status);
       return { id, status: data.status };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to update status.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to update status.'));
     }
   }
 );
@@ -33,7 +34,7 @@ export const updateTask = createAsyncThunk(
       const data = await taskService.updateTask(id, payload);
       return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to update task.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to update task.'));
     }
   }
 );
@@ -45,7 +46,7 @@ export const deleteTask = createAsyncThunk(
       await taskService.deleteTask(id);
       return id;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to delete task.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to delete task.'));
     }
   }
 );
@@ -57,7 +58,7 @@ export const addComment = createAsyncThunk(
       const data = await taskService.addComment(id, content);
       return { taskId: id, comment: data };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error || 'Failed to save comment.');
+      return rejectWithValue(getErrorMessage(error, 'Failed to save comment.'));
     }
   }
 );
