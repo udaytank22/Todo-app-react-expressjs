@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import axios from 'axios';
+import { taskService } from './services/taskService';
 import { encrypt, decrypt } from './utils/encryption';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -76,9 +76,9 @@ const AppContent = () => {
     const fetchMailStatus = async () => {
         if (!token) return;
         try {
-            const response = await axios.get('/api/emails/status');
-            setIsMailConnected(response.data.connected);
-            setIsDemoMode(response.data.demoMode);
+            const data = await taskService.getEmailSyncStatus();
+            setIsMailConnected(data.connected);
+            setIsDemoMode(data.demoMode);
         } catch (error) {
             console.error('Failed to fetch Outlook sync status:', error.message);
         }

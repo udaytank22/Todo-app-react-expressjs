@@ -1,16 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import { notificationService } from '../services/notificationService';
 
 // 1. Async Thunks
 export const fetchNotifications = createAsyncThunk(
   'notifications/fetchNotifications',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const query = new URLSearchParams();
-      if (params.page) query.set('page', params.page);
-      if (params.limit) query.set('limit', params.limit);
-      const response = await axios.get(`/api/notifications?${query.toString()}`);
-      return response.data;
+      const data = await notificationService.getNotifications(params);
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to fetch notifications.');
     }
@@ -21,8 +18,8 @@ export const markNotificationRead = createAsyncThunk(
   'notifications/markNotificationRead',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(`/api/notifications/${id}/read`);
-      return response.data;
+      const data = await notificationService.markNotificationRead(id);
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to mark notification as read.');
     }
@@ -33,8 +30,8 @@ export const markAllNotificationsRead = createAsyncThunk(
   'notifications/markAllNotificationsRead',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.patch('/api/notifications/read-all');
-      return response.data;
+      const data = await notificationService.markAllNotificationsRead();
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to mark all notifications as read.');
     }

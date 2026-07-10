@@ -1,22 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import { taskService } from '../services/taskService';
 
 // 1. Async Thunks
 export const fetchTasks = createAsyncThunk(
   'tasks/fetchTasks',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const query = new URLSearchParams();
-      if (params.page) query.set('page', params.page);
-      if (params.limit) query.set('limit', params.limit);
-      if (params.status) query.set('status', params.status);
-      if (params.priority) query.set('priority', params.priority);
-      if (params.search) query.set('search', params.search);
-      if (params.sortBy) query.set('sortBy', params.sortBy);
-      if (params.sortOrder) query.set('sortOrder', params.sortOrder);
-      if (params.customer) query.set('customer', params.customer);
-      const response = await axios.get(`/api/tasks?${query.toString()}`);
-      return response.data;
+      const data = await taskService.getTasks(params);
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to fetch tasks.');
     }
@@ -27,8 +18,8 @@ export const updateTaskStatus = createAsyncThunk(
   'tasks/updateTaskStatus',
   async ({ id, status }, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(`/api/tasks/${id}/status`, { status });
-      return { id, status: response.data.status };
+      const data = await taskService.updateTaskStatus(id, status);
+      return { id, status: data.status };
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to update status.');
     }
@@ -39,8 +30,8 @@ export const updateTask = createAsyncThunk(
   'tasks/updateTask',
   async ({ id, payload }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`/api/tasks/${id}`, payload);
-      return response.data;
+      const data = await taskService.updateTask(id, payload);
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to update task.');
     }
@@ -51,7 +42,7 @@ export const deleteTask = createAsyncThunk(
   'tasks/deleteTask',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`/api/tasks/${id}`);
+      await taskService.deleteTask(id);
       return id;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to delete task.');
@@ -63,8 +54,8 @@ export const addComment = createAsyncThunk(
   'tasks/addComment',
   async ({ id, content }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`/api/tasks/${id}/comments`, { content });
-      return { taskId: id, comment: response.data };
+      const data = await taskService.addComment(id, content);
+      return { taskId: id, comment: data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || 'Failed to save comment.');
     }

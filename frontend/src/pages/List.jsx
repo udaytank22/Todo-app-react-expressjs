@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { authService } from '../services/authService';
 import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -70,8 +70,8 @@ const List = ({ socket, searchVal }) => {
 
     const fetchUsers = async () => {
         try {
-            const response = await axios.get('/api/auth/users');
-            setUsers(response.data);
+            const data = await authService.getUsers();
+            setUsers(data);
         } catch (error) {
             console.error('Failed to load users:', error);
         }
